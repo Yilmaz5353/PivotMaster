@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pivot Master</title>
+    <style>
+        :root { --neon-blue: #00f2ff; --danger: #ff0055; --record: #ffcc00; --bg: #050510; --success: #00ff99; }
+        body { 
+            margin: 0; background: var(--bg); color: white; 
+            font-family: 'Segoe UI', sans-serif; overflow: hidden; 
+            touch-action: none; display: flex; justify-content: center; align-items: center; 
+            height: 100vh; width: 100vw; touch-action: auto;
+        }
+        
+        canvas { 
+            background: linear-gradient(180deg, #0a0a1a 0%, #000000 100%); 
+            touch-action: none;
+        }
+
+        .overlay { 
+            position: absolute; width: 100vw; height: 100vh;
+            display: flex; flex-direction: column; justify-content: center; 
+            align-items: center; text-align: center; z-index: 100;
+        }
+
+        .hidden { display: none !important; }
+        
+        h1 { 
+            font-size: 60px; margin-bottom: 20px; 
+            color: white; 
+            text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue); 
+            letter-spacing: 5px; font-weight: 900;
+        }
+        
+        button { 
+            background: rgba(0, 0, 0, 0.6); border: 2px solid var(--neon-blue); color: var(--neon-blue);
+            padding: 15px 50px; font-size: 18px; cursor: pointer; border-radius: 8px;
+            margin: 10px; font-weight: bold; width: 250px; z-index: 110; 
+            transition: 0.3s; text-shadow: 0 0 10px var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+        }
+        button:hover { 
+            background: var(--neon-blue); color: #000; 
+            box-shadow: 0 0 50px var(--neon-blue); transform: scale(1.05);
+        }
+
+        #liveScore { 
+            position: absolute; top: 50px; font-size: 80px; font-weight: 900; 
+            color: rgba(255, 255, 255, 0.1); pointer-events: none; z-index: 5;
+            text-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        #achNotification {
+            position: absolute; top: -120px; left: 50%;
+            transform: translateX(-50%);
+            width: 320px; max-width: 90vw;
+            background: rgba(10, 10, 20, 0.95);
+            border: 2px solid var(--record);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex; align-items: center; gap: 15px;
+            box-shadow: 0 0 40px var(--record);
+            z-index: 200;
+            transition: top 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .show-notify { top: 30px !important; }
+
+        #achievementsList {
+            width: 85%; max-width: 400px; height: 350px; overflow-y: auto; margin-top: 20px; padding-right: 5px;
+            touch-action: pan-y;
+        }
+        #achievementsList::-webkit-scrollbar { width: 4px; }
+        #achievementsList::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 10px; }
+
+        .achievement-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; margin-bottom: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; background: rgba(0,0,0,0.5);
+            text-align: left;
+        }
+        .ach-locked { color: #555; }
+        .ach-unlocked { border-color: var(--record); color: white; box-shadow: 0 0 15px rgba(255,204,0,0.3); }
+        .ach-title { font-weight: bold; color: var(--record); font-size: 14px; }
+
+        #pauseBtn {
+            position: absolute; top: 20px; right: 20px;
+            width: 50px !important; height: 50px !important; border-radius: 50%;
+            font-size: 20px; z-index: 150; padding: 0 !important;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* YENİ: İNTERNET KOPTU EKRANI STİLİ */
+        #offlineOverlay {
+            background: rgba(5, 5, 15, 0.98);
+            z-index: 9999; /* Her şeyin üstünde durması için */
+        }
+
+
+        /* Pivot Master - görsel iyileştirmeler */
+        body::before {
+            content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+            background:
+                radial-gradient(ellipse at 50% 42%, rgba(35, 32, 104, 0.20), transparent 58%),
+                radial-gradient(ellipse at 12% 34%, rgba(0, 155, 205, 0.055), transparent 42%),
+                radial-gradient(ellipse at 90% 72%, rgba(115, 70, 220, 0.055), transparent 45%),
+                radial-gradient(ellipse at 50% 100%, rgba(0, 105, 160, 0.10), transparent 55%);
+        }
+        .overlay { padding: 24px 16px; box-sizing: border-box; }
+        #mainMenu {
+            gap: 5px;
+            background: radial-gradient(ellipse at 50% 40%, rgba(14, 23, 55, 0.34), rgba(5, 5, 16, 0.16) 58%, transparent 78%);
+        }
+        .brand-title {
+            font-size: clamp(48px, 12vw, 66px); line-height: 0.94; letter-spacing: 5px;
+            margin: 0 0 13px; font-weight: 950;
+            color: #f7fcff;
+            text-shadow: 0 0 12px rgba(0,242,255,.62), 0 0 30px rgba(0,153,255,.46), 0 0 58px rgba(106,61,255,.28);
+        }
+        .brand-title span {
+            color: #b8faff;
+            text-shadow: 0 0 10px rgba(0,242,255,.95), 0 0 28px rgba(0,180,255,.65), 0 0 48px rgba(94,74,255,.45);
+        }
+        .brand-caption {
+            margin: 0 0 22px; color: rgba(194, 220, 245, .62);
+            font-size: 10px; letter-spacing: 4px; font-weight: 700;
+        }
+        button {
+            width: min(270px, 82vw); box-sizing: border-box; padding: 15px 24px;
+            border: 1px solid rgba(0,242,255,.72); border-radius: 13px;
+            background: linear-gradient(135deg, rgba(10,24,43,.94), rgba(8,8,27,.92));
+            color: #b9faff; font-size: 14px; letter-spacing: 1.7px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.25), inset 0 0 18px rgba(0,242,255,.055), 0 0 14px rgba(0,242,255,.12);
+            text-shadow: 0 0 10px rgba(0,242,255,.55);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        }
+        button:hover {
+            background: linear-gradient(110deg, rgba(0,242,255,.96), rgba(88,190,255,.96));
+            color: #031019; border-color: #a9fbff;
+            box-shadow: 0 0 28px rgba(0,242,255,.38), inset 0 0 14px rgba(255,255,255,.25);
+            text-shadow: none; transform: translateY(-2px) scale(1.025);
+        }
+        button:active { transform: scale(.975); }
+        #bestDisplay {
+            margin-top: 17px !important; padding: 10px 19px; min-width: 135px;
+            box-sizing: border-box; border: 1px solid rgba(0,242,255,.22);
+            border-radius: 999px; background: rgba(3,13,27,.66);
+            font-size: 12px; font-weight: 800; letter-spacing: 2px;
+            box-shadow: inset 0 0 16px rgba(0,242,255,.05), 0 0 18px rgba(0,242,255,.07);
+        }
+        #settingsMenu h1, #pauseMenu h1 { margin-bottom: 23px; }
+
+        /* Pause menu mirrors the main menu while keeping the frozen game visible underneath. */
+        #pauseMenu.pause-overlay {
+            gap: 5px;
+            background: radial-gradient(ellipse at 50% 40%, rgba(14, 23, 55, .24), rgba(5, 8, 24, .48) 62%, rgba(3, 5, 16, .54));
+            backdrop-filter: blur(1.5px);
+            -webkit-backdrop-filter: blur(1.5px);
+        }
+        #pauseMenu .pause-title {
+            margin: 0 0 13px;
+            font-size: clamp(48px, 12vw, 66px);
+            line-height: .94;
+            letter-spacing: 5px;
+        }
+        #pauseMenu .pause-caption { margin-bottom: 22px; }
+        #pauseMenu button { margin: 8px 10px; }
+        .settings-panel {
+            width: min(300px, 84vw); box-sizing: border-box; padding: 20px 20px 18px;
+            margin: 0 0 18px; border: 1px solid rgba(0,242,255,.28);
+            border-radius: 16px; background: linear-gradient(145deg, rgba(10,25,45,.88), rgba(8,8,25,.88));
+            box-shadow: 0 12px 35px rgba(0,0,0,.25), inset 0 0 22px rgba(0,242,255,.045);
+        }
+        .setting-heading {
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            color: #d9faff; font-size: 12px; font-weight: 800; letter-spacing: 1.5px;
+        }
+        #musicVolumeValue { color: var(--neon-blue); font-size: 14px; text-shadow: 0 0 10px rgba(0,242,255,.7); }
+        #musicVolume {
+            display: block; width: 100%; box-sizing: border-box;
+            margin: 10px 0 0; height: 38px; padding: 0;
+            appearance: none; -webkit-appearance: none; border: 0; border-radius: 99px; outline: none;
+            background: transparent; cursor: pointer; touch-action: pan-x;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #musicVolume::-webkit-slider-runnable-track {
+            height: 7px; border-radius: 99px;
+            background: linear-gradient(90deg, #00f2ff, #7055ff);
+        }
+        #musicVolume::-moz-range-track {
+            height: 7px; border-radius: 99px;
+            background: linear-gradient(90deg, #00f2ff, #7055ff);
+        }
+        #musicVolume::-webkit-slider-thumb {
+            appearance: none; -webkit-appearance: none; width: 24px; height: 24px;
+            margin-top: -8.5px; border-radius: 50%; border: 2px solid #e8ffff; background: #00dff5;
+            box-shadow: 0 0 13px rgba(0,242,255,.9); cursor: grab;
+        }
+        #musicVolume::-moz-range-thumb {
+            width: 22px; height: 22px; border-radius: 50%; border: 2px solid #e8ffff;
+            background: #00dff5; box-shadow: 0 0 13px rgba(0,242,255,.9); cursor: grab;
+        }
+        @media (pointer: coarse) {
+            #musicVolume { height: 48px; margin-top: 8px; }
+            #musicVolume::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -10.5px; }
+            #musicVolume::-moz-range-thumb { width: 26px; height: 26px; }
+        }
+        #pauseBtn { width: 50px !important; min-width: 50px; padding: 0 !important; }
+        #achievementsList { border-radius: 10px; }
+
+        .settings-toggle {
+            width: 100%; margin: 18px 0 0; padding: 12px 14px;
+            border-color: rgba(151, 113, 255, .55);
+            color: #d8ceff;
+            background: linear-gradient(120deg, rgba(47, 31, 91, .72), rgba(11, 18, 42, .9));
+            box-shadow: inset 0 0 16px rgba(135, 87, 255, .08), 0 0 16px rgba(135, 87, 255, .09);
+        }
+        .settings-toggle.is-off {
+            border-color: rgba(255,255,255,.22); color: rgba(225,235,255,.64);
+            background: rgba(10,13,25,.8); box-shadow: none; text-shadow: none;
+        }
+
+        #deathFlash {
+            position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(225,250,255,.68) 0%, rgba(95,145,255,.24) 22%, rgba(104,55,255,.12) 43%, transparent 70%);
+            mix-blend-mode: screen;
+        }
+        #deathFlash.flash-active { animation: deathImpactFlash .48s ease-out both; }
+        @keyframes deathImpactFlash {
+            0% { opacity: 0; transform: scale(.72); }
+            16% { opacity: .95; }
+            100% { opacity: 0; transform: scale(1.35); }
+        }
+
+        #gameOver {
+            z-index: 120;
+            background: radial-gradient(ellipse at 50% 46%, rgba(21, 25, 64, .57), rgba(3, 5, 17, .78) 68%);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        #gameOver.gameover-enter { animation: gameoverBackdrop .62s ease-out both; }
+        @keyframes gameoverBackdrop {
+            from { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+            to { opacity: 1; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        }
+        .gameover-card {
+            position: relative; width: min(350px, 88vw); box-sizing: border-box;
+            padding: 34px 24px 23px; overflow: hidden;
+            border: 1px solid rgba(125, 190, 255, .38); border-radius: 24px;
+            background: linear-gradient(150deg, rgba(14, 25, 52, .96), rgba(7, 8, 27, .97) 62%, rgba(24, 12, 49, .96));
+            box-shadow: 0 22px 70px rgba(0,0,0,.58), 0 0 34px rgba(66, 126, 255, .18), inset 0 1px 0 rgba(255,255,255,.12);
+            opacity: 0; transform: translateY(54px) scale(.64) rotateX(18deg); filter: blur(15px);
+            transform-origin: 50% 65%;
+        }
+        .gameover-card::before {
+            content: ""; position: absolute; inset: -1px; pointer-events: none; border-radius: inherit;
+            background: linear-gradient(115deg, transparent 12%, rgba(139,205,255,.18) 42%, rgba(180,125,255,.10) 52%, transparent 72%);
+            transform: translateX(-115%);
+        }
+        .gameover-enter .gameover-card { animation: totemMenuEnter .96s cubic-bezier(.12,.88,.2,1) both; }
+        .gameover-enter .gameover-card::before { animation: cardSheen 1.05s .24s ease-out both; }
+        @keyframes totemMenuEnter {
+            0% { opacity: 0; transform: translateY(54px) scale(.64) rotateX(18deg); filter: blur(15px); }
+            34% { opacity: 1; transform: translateY(-11px) scale(1.055) rotateX(-4deg); filter: blur(0); }
+            57% { transform: translateY(4px) scale(.985) rotateX(1deg); }
+            76% { transform: translateY(-2px) scale(1.012) rotateX(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); filter: blur(0); }
+        }
+        @keyframes cardSheen { to { transform: translateX(115%); } }
+        .gameover-card h2 {
+            margin: 4px 0 12px; font-size: clamp(34px, 9vw, 46px) !important; letter-spacing: 3px;
+            transform-origin: 50% 60%;
+        }
+        .gameover-enter .gameover-card h2 { animation: resultTitleHit .62s .12s cubic-bezier(.16,1.25,.3,1) both; }
+        @keyframes resultTitleHit {
+            0% { opacity: 0; transform: translateY(15px) scale(.78); filter: blur(8px); }
+            70% { opacity: 1; transform: translateY(-2px) scale(1.045); filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        .gameover-score { margin: 0 0 18px !important; color: rgba(232,246,255,.9); font-weight: 800; letter-spacing: 2px; }
+        .gameover-enter .gameover-score { animation: resultScoreRise .55s .22s ease-out both; }
+        @keyframes resultScoreRise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .gameover-card button { width: 100%; margin: 7px 0; }
+        .gameover-card .revive-btn {
+            border: 1px solid rgba(112, 255, 224, .9);
+            color: #eafffb;
+            background: linear-gradient(110deg, rgba(0, 190, 176, .30), rgba(0, 104, 166, .34) 52%, rgba(105, 74, 255, .34));
+            box-shadow: 0 0 22px rgba(0, 238, 220, .24), inset 0 0 20px rgba(154, 255, 244, .08);
+            text-shadow: 0 0 12px rgba(127, 255, 240, .76);
+            letter-spacing: 1.35px;
+        }
+        .gameover-card .revive-btn:hover {
+            color: #041a20;
+            background: linear-gradient(110deg, #9affef, #82dcff 55%, #b2a0ff);
+            border-color: #e2ffff;
+            box-shadow: 0 0 34px rgba(87, 255, 232, .55);
+        }
+        .gameover-card .revive-btn:disabled { opacity: .55; filter: grayscale(.5); }
+        .gameover-enter #reviveBtn { animation: resultButtonRise .58s .29s cubic-bezier(.18,.8,.25,1) both; }
+        .gameover-enter #retryBtn { animation: resultButtonRise .54s .37s cubic-bezier(.18,.8,.25,1) both; }
+        .gameover-enter .gameover-menu-btn { animation: resultButtonRise .54s .45s cubic-bezier(.18,.8,.25,1) both; }
+        @keyframes resultButtonRise {
+            0% { opacity: 0; transform: translateY(21px) scale(.9); filter: blur(5px); }
+            75% { opacity: 1; transform: translateY(-2px) scale(1.025); filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        /* Patlama menüye dönüştüğü anda tüm oyun alanında kısa, sönümlenen sarsıntı. */
+        body.death-screen-shake { animation: globalDeathShake .42s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes globalDeathShake {
+            0% { transform: translate3d(0,0,0); }
+            12% { transform: translate3d(-10px,5px,0); }
+            25% { transform: translate3d(8px,-5px,0); }
+            39% { transform: translate3d(-6px,3px,0); }
+            54% { transform: translate3d(4px,-2px,0); }
+            70% { transform: translate3d(-2px,1px,0); }
+            100% { transform: translate3d(0,0,0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .gameover-enter, .gameover-enter .gameover-card,
+            .gameover-enter .gameover-card h2, .gameover-enter .gameover-score,
+            .gameover-enter #retryBtn, .gameover-enter .gameover-menu-btn,
+            .gameover-enter .gameover-stat, #deathFlash.flash-active,
+            body.death-screen-shake, .combo-text.combo-renew, .combo-float, .combo-spark,
+            .score-gain.show, #achNotification.show-notify { animation-duration: .01ms !important; }
+        }
+        @media (max-height: 650px) {
+            .brand-title { font-size: 48px; margin-bottom: 8px; }
+            .brand-caption { margin-bottom: 10px; }
+            #mainMenu button { margin: 6px; padding: 12px 20px; }
+            #bestDisplay { margin-top: 8px !important; }
+        }
+
+        /* Combo göstergesi: kutusuz, oyun alanında beliren ve süresi doldukça silinen tipografi. */
+        .combo-text {
+            position: absolute; z-index: 12; top: 142px; left: 50%;
+            display: flex; align-items: baseline; justify-content: center; gap: 13px;
+            min-width: 180px; pointer-events: none; white-space: nowrap;
+            opacity: 0; transform: translate(-50%, 7px) scale(.94);
+            transform-origin: 50% 50%; filter: blur(0);
+        }
+        #comboLevel { color: #ff5968; font-family: 'Segoe UI', sans-serif; font-size: 19px; font-weight: 500; letter-spacing: .6px; text-shadow: 0 0 7px rgba(255,55,75,.28); }
+        #comboPending { color: #ff7880; font-family: 'Segoe UI', sans-serif; font-size: 17px; font-weight: 650; text-shadow: 0 0 8px rgba(255,55,75,.35); }
+        .combo-text.combo-tier-2 #comboLevel { color: #ff626f; font-size: 21px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 0 9px rgba(255,49,73,.8), 0 0 20px rgba(255,35,63,.42); }
+        .combo-text.combo-tier-2 #comboPending { color: #ff9a9f; font-size: 19px; font-weight: 800; text-shadow: 0 0 12px rgba(255,62,83,.7); }
+        .combo-text.combo-tier-3 #comboLevel { color: #ffd75f; font-family: Georgia, 'Times New Roman', serif; font-size: 25px; font-weight: 900; font-style: italic; letter-spacing: 1.2px; text-shadow: 0 0 10px rgba(255,198,55,.95), 0 0 25px rgba(255,162,30,.58); }
+        .combo-text.combo-tier-3 #comboPending { color: #ffe9a0; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 900; text-shadow: 0 0 14px rgba(255,196,55,.8); }
+        .combo-text.combo-tier-4 #comboLevel { color: #ffe28a; font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 900; font-style: italic; letter-spacing: 1.5px; text-shadow: 0 0 12px rgba(255,205,80,1), 0 0 28px rgba(255,161,35,.72); }
+        .combo-text.combo-tier-4 #comboPending { color: #fff0b8; font-size: 21px; font-weight: 900; text-shadow: 0 0 15px rgba(255,197,75,.92); }
+        .combo-text.combo-renew { animation: comboRewardRenew .58s cubic-bezier(.12,1.35,.25,1) both; }
+        .combo-text.combo-tier-3.combo-renew, .combo-text.combo-tier-4.combo-renew { animation-name: comboGoldenRenew; }
+        @keyframes comboRewardRenew {
+            0% { transform: translate(-50%,7px) scale(.72); filter: blur(3px); }
+            44% { transform: translate(-50%,-3px) scale(1.28); filter: blur(0); }
+            70% { transform: translate(-50%,1px) scale(.96); }
+            100% { transform: translate(-50%,0) scale(1); }
+        }
+        @keyframes comboGoldenRenew {
+            0% { transform: translate(-50%,8px) scale(.68) rotate(-3deg); filter: blur(4px) brightness(1.8); }
+            38% { transform: translate(-50%,-5px) scale(1.42) rotate(1deg); filter: blur(0) brightness(1.45); }
+            64% { transform: translate(-50%,1px) scale(.96) rotate(0); filter: brightness(1.12); }
+            100% { transform: translate(-50%,0) scale(1); filter: brightness(1); }
+        }
+        #liveScore.score-combo-hit { animation: scoreComboHit .42s cubic-bezier(.15,1.25,.3,1); }
+        @keyframes scoreComboHit { 0% { transform: scale(1); color: rgba(255,255,255,.1); } 45% { transform: scale(1.22); color: #cceeff; text-shadow: 0 0 24px rgba(91,170,255,.75); } 100% { transform: scale(1); } }
+        .score-gain {
+            position: absolute; z-index: 14; top: 99px; left: 50%;
+            color: #c6eaff; font-size: 13px; font-weight: 900; letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(93,151,255,.85); opacity: 0;
+            transform: translate(-50%, 10px) scale(.86); pointer-events: none; white-space: nowrap;
+        }
+        .score-gain.show { animation: scoreBankFly 1.05s cubic-bezier(.18,.75,.25,1) both; }
+        @keyframes scoreBankFly { 0% { opacity: 0; transform: translate(-50%, 12px) scale(.78); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.12); } 70% { opacity: 1; transform: translate(-50%, -8px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -23px) scale(.96); } }
+        #floatingEffects { position: fixed; inset: 0; z-index: 70; overflow: hidden; pointer-events: none; }
+        .combo-float {
+            position: absolute; color: #ff6877; font-weight: 900; font-size: 21px; letter-spacing: .5px;
+            text-shadow: 0 0 9px rgba(255,60,82,.72), 0 0 22px rgba(255,38,65,.42);
+            transform: translate(-50%, -50%) scale(.45); animation: nearMissFloat .9s cubic-bezier(.12,1.15,.25,1) both;
+            white-space: nowrap;
+        }
+        .combo-float.combo-tier-2 { color: #ff9aa1; font-size: 23px; text-shadow: 0 0 12px rgba(255,54,76,.95), 0 0 27px rgba(255,45,68,.72); }
+        .combo-float.combo-tier-3, .combo-float.combo-tier-4 { color: #ffe078; font-family: Georgia, 'Times New Roman', serif; font-size: 25px; text-shadow: 0 0 13px rgba(255,205,74,1), 0 0 30px rgba(255,162,40,.8); }
+        @keyframes nearMissFloat { 0% { opacity: 0; transform: translate(-50%,-20%) scale(.45); } 23% { opacity: 1; transform: translate(-50%,-55%) scale(1.38); } 48% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-165%) scale(.92); } }
+        .combo-spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; pointer-events: none; animation: comboSparkFly .62s cubic-bezier(.12,.7,.2,1) both; }
+        @keyframes comboSparkFly { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.2); } 18% { opacity: 1; transform: translate(-50%,-50%) scale(1.35); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.15); } }
+
+        /* Başarım bildirimi: kayan kart, madalya sıçraması ve ışık taraması. */
+        #achNotification {
+            top: -145px; left: 50%; transform: translateX(-50%);
+            border: 1px solid rgba(255,215,128,.55); border-radius: 17px;
+            background: linear-gradient(125deg, rgba(15,22,48,.98), rgba(27,19,55,.98));
+            box-shadow: 0 14px 40px rgba(0,0,0,.48), 0 0 28px rgba(255,195,75,.18), inset 0 1px 0 rgba(255,255,255,.12);
+            overflow: hidden;
+        }
+        #achNotification::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(110deg, transparent 18%, rgba(255,230,170,.16) 48%, transparent 72%); transform: translateX(-130%); }
+        #achNotification.show-notify { top: 24px !important; animation: achievementArrival .68s cubic-bezier(.16,1.2,.3,1) both; }
+        #achNotification.show-notify::before { animation: achievementShine .9s .12s ease-out both; }
+        .ach-icon-wrap { flex: 0 0 47px; width: 47px; height: 47px; display: grid; place-items: center; border-radius: 14px; color: #fff1bf; font-size: 27px; background: linear-gradient(145deg, #7657cf, #b482e9 58%, #f0c66e); box-shadow: 0 0 22px rgba(196,147,255,.35), inset 0 1px 0 rgba(255,255,255,.38); }
+        #achNotification.show-notify .ach-icon-wrap { animation: achievementMedal .62s .12s cubic-bezier(.15,1.4,.3,1) both; }
+        .ach-notify-copy { flex: 1; min-width: 0; text-align: left; }
+        .ach-notify-kicker { color: #d5bbff; font-size: 8px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+        #notifyTitle { margin: 0; color: #ffdf9b; font-size: 15px; font-weight: 950; letter-spacing: .4px; }
+        #notifyDesc { margin: 3px 0 0; color: rgba(239,243,255,.72); font-size: 11px; }
+        .ach-notify-spark { color: #ffdf9b; font-size: 23px; text-shadow: 0 0 14px rgba(255,215,128,.8); }
+        @keyframes achievementArrival { 0% { opacity: 0; transform: translate(-50%,-25px) scale(.84); } 68% { opacity: 1; transform: translate(-50%,7px) scale(1.025); } 100% { opacity: 1; transform: translate(-50%,0) scale(1); } }
+        @keyframes achievementShine { to { transform: translateX(130%); } }
+        @keyframes achievementMedal { 0% { opacity: 0; transform: rotate(-24deg) scale(.45); } 70% { opacity: 1; transform: rotate(8deg) scale(1.13); } 100% { transform: rotate(0) scale(1); } }
+
+        /* Ölüm ekranında rekor ve combo özeti. */
+        .gameover-card {
+            border-color: rgba(135,177,255,.48);
+            background: radial-gradient(ellipse at 50% 0%, rgba(77,76,154,.22), transparent 47%), linear-gradient(150deg, rgba(12,23,50,.98), rgba(5,7,25,.98) 62%, rgba(26,13,53,.98));
+            box-shadow: 0 25px 85px rgba(0,0,0,.7), 0 0 44px rgba(81,116,255,.24), inset 0 1px 0 rgba(255,255,255,.16);
+        }
+        .gameover-kicker { margin-bottom: 9px; color: rgba(183,207,255,.58); font-size: 9px; font-weight: 950; letter-spacing: 3.5px; }
+        .gameover-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 7px 0 16px; }
+        .gameover-stat { padding: 10px 7px 9px; border: 1px solid rgba(153,170,255,.18); border-radius: 12px; background: linear-gradient(145deg, rgba(25,34,75,.6), rgba(13,13,42,.72)); }
+        .gameover-stat span { display: block; color: rgba(193,208,255,.58); font-size: 8px; font-weight: 900; letter-spacing: 1.5px; }
+        .gameover-stat strong { display: block; margin-top: 4px; color: #d9e8ff; font-size: 21px; text-shadow: 0 0 13px rgba(111,143,255,.62); }
+        #finalComboBonus { color: #cdbdff; }
+        .gameover-score { display: flex; flex-direction: column; gap: 1px; align-items: center; margin: 0 0 17px !important; color: #fff; }
+        .gameover-score span { color: rgba(197,216,255,.58); font-size: 9px; font-weight: 900; letter-spacing: 3px; }
+        .gameover-score strong { font-size: 48px; line-height: 1; font-weight: 950; letter-spacing: 2px; color: #eaf8ff; text-shadow: 0 0 17px rgba(81,190,255,.56), 0 0 38px rgba(117,91,255,.25); }
+        .gameover-enter .gameover-stat { animation: resultStatRise .56s .2s cubic-bezier(.18,.8,.25,1) both; }
+        .gameover-enter .gameover-stat:nth-child(2) { animation-delay: .28s; }
+        @keyframes resultStatRise { from { opacity: 0; transform: translateY(13px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @media (max-height: 650px) {
+            .combo-text { top: 126px; }
+            .gameover-card { padding: 23px 20px 17px; }
+            .gameover-score strong { font-size: 40px; }
+            .gameover-stats { margin: 4px 0 10px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="offlineOverlay" class="overlay hidden">
+        <div style="font-size: 80px; margin-bottom: 20px; animation: pulse 1s infinite;">⚠️</div>
+        <h1 style="color: var(--danger); font-size: 40px; text-shadow: 0 0 30px var(--danger); margin: 0;">BAĞLANTI KOPTU</h1>
+        <p style="font-size: 18px; color: white; margin-top: 10px;">Lütfen internet bağlantınızı kontrol edin...</p>
+    </div>
+
+    <div id="achNotification" aria-live="polite">
+        <div class="ach-icon-wrap"><span>★</span></div>
+        <div class="ach-notify-copy">
+            <div class="ach-notify-kicker">TROPHY UNLOCKED</div>
+            <h3 id="notifyTitle">UNLOCKED!</h3>
+            <p id="notifyDesc">Trophy</p>
+        </div>
+        <div class="ach-notify-spark">✦</div>
+    </div>
+
+    <button id="pauseBtn" class="hidden" onclick="togglePause()">II</button>
+
+    <div id="mainMenu" class="overlay">
+        <h1 class="brand-title">PIVOT<br><span>MASTER</span></h1>
+        <div class="brand-caption">ONE TAP · ONE ORBIT</div>
+        <button onclick="startGame()">START GAME</button>
+        <button onclick="showAchievements()">TROPHIES</button>
+        <button onclick="showSettings('MENU')">SETTINGS</button>
+        <div id="bestDisplay">BEST: 0</div>
+    </div>
+
+    <div id="settingsMenu" class="overlay hidden">
+        <h1 style="font-size: 40px;">SETTINGS</h1>
+        <div class="settings-panel">
+            <div class="setting-heading">
+                <label for="musicVolume">MUSIC VOLUME</label>
+                <span id="musicVolumeValue">45%</span>
+            </div>
+            <input id="musicVolume" type="range" min="0" max="100" step="1" value="45" oninput="setMusicVolume(this.value)">
+            <button id="effectsToggleBtn" class="settings-toggle" onclick="toggleVisualEffects()">PARTICLE EFFECTS: ON</button>
+            <button id="vibrationToggleBtn" class="settings-toggle" onclick="toggleVibration()">VIBRATION: ON</button>
+        </div>
+        <button onclick="goBackFromSettings()">BACK</button>
+    </div>
+
+    <div id="achievementsMenu" class="overlay hidden">
+        <h1 style="font-size: 30px; color: var(--record); text-shadow: 0 0 20px var(--record);">TROPHIES</h1>
+        <div id="achievementsList"></div>
+        <button onclick="showMenu()" style="margin-top: 20px;">BACK</button>
+    </div>
+
+    <div id="pauseMenu" class="overlay hidden pause-overlay">
+        <h1 class="brand-title pause-title">PAUSED</h1>
+        <div class="brand-caption pause-caption">TAKE A BREATH · READY WHEN YOU ARE</div>
+        <button onclick="resumeGame()">RESUME</button>
+        <button onclick="showSettings('PAUSED')">SETTINGS</button>
+        <button onclick="quitToMenu()">MAIN MENU</button>
+    </div>
+
+    <div id="tapStart" class="overlay hidden">
+        <div id="tapHint" style="font-size:20px; color:white; text-shadow: 0 0 10px white; animation: pulse 1.5s infinite;">TAP TO PIVOT</div>
+    </div>
+    <style>@keyframes pulse { 0%{opacity:0.5;} 50%{opacity:1;} 100%{opacity:0.5;} }</style>
+
+    <div id="deathFlash" aria-hidden="true"></div>
+
+    <div id="gameOver" class="overlay hidden">
+        <div class="gameover-card" id="gameOverCard">
+            <div class="gameover-kicker">RUN COMPLETE</div>
+            <h2 id="deathTitle" style="font-size:50px; color: var(--danger); text-shadow: 0 0 30px var(--danger);">SHATTERED</h2>
+            <div id="newRecordAlert" class="hidden" style="color: var(--record); font-weight: bold; font-size: 20px; margin-bottom: 10px; text-shadow: 0 0 10px var(--record); animation: pulse 1s infinite;">NEW RECORD!</div>
+            <div class="gameover-stats">
+                <div class="gameover-stat"><span>BEST COMBO</span><strong id="finalCombo">0×</strong></div>
+                <div class="gameover-stat"><span>COMBO BONUS</span><strong id="finalComboBonus">+0</strong></div>
+            </div>
+            <div id="finalScore" class="gameover-score"><span>FINAL SCORE</span><strong id="finalScoreValue">0</strong></div>
+            <button id="reviveBtn" class="revive-btn hidden" onclick="requestRevive()">✦ REVIVE · WATCH AD</button>
+            <button id="retryBtn" onclick="startGame()">RETRY</button>
+            <button class="gameover-menu-btn" onclick="showMenu()">MENU</button>
+        </div>
+    </div>
+
+    <div id="liveScore" class="hidden">0</div>
+    <div id="comboHud" class="combo-text hidden" aria-live="polite">
+        <strong id="comboLevel">COMBO ×1</strong>
+        <strong id="comboPending">+5</strong>
+    </div>
+    <div id="scoreGain" class="score-gain" aria-live="polite"></div>
+    <div id="floatingEffects" aria-hidden="true"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        // Oyun tamamen opak çizildiği için alpha:false ve desynchronized bazı mobil
+        // tarayıcılarda Canvas sunum maliyetini azaltabilir. Desteklenmeyen seçenekler yok sayılır.
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        let dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const backgroundCanvas = document.createElement('canvas');
+        const backgroundCtx = backgroundCanvas.getContext('2d', { alpha: false });
+        let lastBackgroundRender = -Infinity;
+        let lastBackgroundDifficulty = -1;
+
+        let cw, ch;
+        const center = { x: 0, y: 0 };
+
+        function resizeCanvas() {
+            cw = window.innerWidth;
+            ch = window.innerHeight;
+            // DPR 3-4 olan telefonlarda tam çözünürlük çok fazla piksel çizdirir.
+            // 2x sınırı keskinliği korurken çizilecek piksel sayısını ciddi azaltır.
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.round(cw * dpr);
+            canvas.height = Math.round(ch * dpr);
+            canvas.style.width = cw + "px";
+            canvas.style.height = ch + "px";
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            // Arka plan yumuşak gradyanlardan oluştuğu için CSS pikselinde önceden çizilir.
+            // Böylece yüksek DPR'de her kare büyük radial gradient hesaplanmaz.
+            backgroundCanvas.width = Math.max(1, Math.ceil(cw));
+            backgroundCanvas.height = Math.max(1, Math.ceil(ch));
+            backgroundCtx.setTransform(1, 0, 0, 1, 0, 0);
+            backgroundCtx.imageSmoothingEnabled = true;
+            lastBackgroundRender = -Infinity;
+            lastBackgroundDifficulty = -1;
+            center.x = cw / 2;
+            center.y = ch / 2;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let state = 'MENU';
+        let previousState = 'MENU';
+        let score = 0;
+
+        // Zorluk yalnızca aktif oyun süresine bağlıdır; skor ve combo bonusları etkilemez.
+        // İki dakikalık, yumuşak başlayan eğri oyunun ilk bölümünü daha sakin tutar.
+        let elapsedRunTimeMs = 0;
+        let difficultyLevel = 0;
+        const DIFFICULTY_RAMP_MS = 120000; // Tam zorluk seviyesine yaklaşık 2 dakikada ulaşılır.
+
+        let bestScore = parseInt(localStorage.getItem('pivotBest')) || 0; 
+        let musicVolume = Math.max(0, Math.min(100, Number(localStorage.getItem('pivotMusicVolume') ?? 45)));
+        let visualEffectsEnabled = localStorage.getItem('pivotVisualEffects') !== 'false';
+        let vibrationEnabled = localStorage.getItem('pivotVibrationEnabled') !== 'false';
+        let deathCinematicStart = null;
+        let deathPhaseStart = null;
+        let deathPhase = null;
+        let deathPosition = { x: 0, y: 0 };
+        let deathWasNewRecord = false;
+        let deathCounter = 0;
+
+        // Her yeni turda sıfırlanan, tek kullanımlık devam hakkı.
+        let reviveUsedThisRun = false;
+        let reviveStartTime = null;
+        let revivePosition = { x: 0, y: 0 };
+        let reviveFragments = [];
+        let reviveShockwaveStart = null;
+        let reviveShockwaveRadius = 0;
+        let reviveShockwaveMaxRadius = 0;
+        let reviveShockwaveStarted = false;
+        const REVIVE_PULL_DURATION = 1180;
+        const REVIVE_WAVE_DURATION = 840;
+
+        // Yakın geçiş combo zinciri: her yeni geçişte +1 bonus, geçiş başına en fazla +10.
+        let comboCount = 0;
+        let comboBonusPending = 0;
+        let comboTimer = 0;
+        let comboBestThisRun = 0;
+        let comboBonusThisRun = 0;
+        let scoreCountAnimation = null;
+        let achievementQueue = [];
+        let achievementToastBusy = false;
+        const COMBO_WINDOW_MS = 1650;
+        const NEAR_MISS_DISTANCE = 48;
+
+        const orbitRadius = 90;
+        let player = { angle: 0, dir: 1, speed: 0.06, size: 8, color: '#00f2ff' };
+        let enemies = [];
+        let enemyTimer = 0;
+        let lastUpdate = 0;
+
+        const neonPalette = ['#00f2ff', '#ff0055', '#00ff99', '#ffff00', '#00ccff', '#ff00ff', '#ffffff', '#0077ff', '#ffaa00'];
+        // Oyuncunun cyan rengi ve ona çok yakın ton, düşmanlarda asla seçilmez.
+        const enemyColorPalette = neonPalette.filter(color =>
+            color.toLowerCase() !== player.color.toLowerCase() && color.toLowerCase() !== '#00ccff'
+        );
+
+        function colorToRgba(hex, alpha) {
+            const value = hex.replace('#', '');
+            const number = parseInt(value, 16);
+            const r = (number >> 16) & 255;
+            const g = (number >> 8) & 255;
+            const b = number & 255;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // Küreler sade kalır: hacim renklerinin koyu merkezinden ve yumuşak kenar ışığından gelir.
+        // Düşmanların ana topu yansıtan parlak noktası, çizim sırasında ışık kaynağına göre eklenir.
+        function createOrbSprite(color, coreRadius = 10, innerRadius = 6, glowStrength = 1, bodyOpacity = 1, darkCenter = false) {
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 64;
+            const sctx = sprite.getContext('2d');
+
+            const aura = sctx.createRadialGradient(32, 32, coreRadius * 0.18, 32, 32, 32);
+            aura.addColorStop(0, colorToRgba(color, 0.42 * glowStrength));
+            aura.addColorStop(0.34, colorToRgba(color, 0.24 * glowStrength));
+            aura.addColorStop(0.68, colorToRgba(color, 0.075 * glowStrength));
+            aura.addColorStop(1, colorToRgba(color, 0));
+            sctx.fillStyle = aura;
+            sctx.fillRect(0, 0, 64, 64);
+
+            const body = sctx.createRadialGradient(29, 27, 0.7, 32, 32, coreRadius * 1.30);
+            if (darkCenter) {
+                // Merkez siyaha düşmez: kürenin kendi renginin daha koyu, doygun tonu olarak kalır.
+                // Ana renk dış bölgede geniş bir bant oluşturur; ince bir kontur gibi görünmez.
+                const centerShade = blendHex(color, '#0b1b2b', 0.30);
+                const innerShade = blendHex(color, '#102638', 0.20);
+                body.addColorStop(0, centerShade);
+                body.addColorStop(0.40, centerShade);
+                body.addColorStop(0.52, innerShade);
+                body.addColorStop(0.62, color);
+                body.addColorStop(0.84, color);
+                body.addColorStop(1, color);
+            } else {
+                const lightColor = blendHex(color, '#ffffff', 0.38);
+                const shadeColor = blendHex(color, '#020817', 0.52);
+                body.addColorStop(0, '#ffffff');
+                body.addColorStop(0.16, lightColor);
+                body.addColorStop(0.48, color);
+                body.addColorStop(0.82, color);
+                body.addColorStop(1, shadeColor);
+            }
+            sctx.globalAlpha = bodyOpacity;
+            sctx.fillStyle = body;
+            sctx.beginPath();
+            sctx.arc(32, 32, coreRadius, 0, Math.PI * 2);
+            sctx.fill();
+            sctx.globalAlpha = 1;
+            return sprite;
+        }
+
+        function createGlowSprite(color, centerColor = '#eaffff') {
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 128;
+            const sctx = sprite.getContext('2d');
+            const glow = sctx.createRadialGradient(64, 64, 1, 64, 64, 64);
+            glow.addColorStop(0, colorToRgba(color, 0.78));
+            glow.addColorStop(0.14, colorToRgba(color, 0.52));
+            glow.addColorStop(0.38, colorToRgba(color, 0.22));
+            glow.addColorStop(0.72, colorToRgba(color, 0.055));
+            glow.addColorStop(1, colorToRgba(color, 0));
+            sctx.fillStyle = glow;
+            sctx.fillRect(0, 0, 128, 128);
+            const core = sctx.createRadialGradient(64, 64, 0, 64, 64, 15);
+            core.addColorStop(0, centerColor);
+            core.addColorStop(0.42, colorToRgba(centerColor, 0.72));
+            core.addColorStop(1, colorToRgba(centerColor, 0));
+            sctx.fillStyle = core;
+            sctx.fillRect(46, 46, 36, 36);
+            return sprite;
+        }
+
+        // Önceden hazırlanmış geniş bloom: patlamada renk ışık gibi yayılır, çizgisel halka kullanılmaz.
+        function createExplosionBloomSprite() {
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 384;
+            const sctx = sprite.getContext('2d');
+            const glow = sctx.createRadialGradient(192, 192, 1, 192, 192, 192);
+            glow.addColorStop(0, 'rgba(255,255,255,1)');
+            glow.addColorStop(0.035, 'rgba(239,255,255,0.98)');
+            glow.addColorStop(0.10, 'rgba(91,245,255,0.94)');
+            glow.addColorStop(0.24, 'rgba(27,177,255,0.66)');
+            glow.addColorStop(0.43, 'rgba(82,105,255,0.34)');
+            glow.addColorStop(0.66, 'rgba(166,83,255,0.13)');
+            glow.addColorStop(0.86, 'rgba(223,91,220,0.035)');
+            glow.addColorStop(1, 'rgba(223,91,220,0)');
+            sctx.fillStyle = glow;
+            sctx.fillRect(0, 0, 384, 384);
+            return sprite;
+        }
+
+        const enemySpriteCache = Object.create(null);
+        enemyColorPalette.forEach(color => { enemySpriteCache[color] = createOrbSprite(color, 10, 6, 0.64, 0.98, true); });
+        const playerSprite = createOrbSprite(player.color, 8.4, 5.2, 1.30, 1);
+        const playerAuraSprite = createGlowSprite('#00e5ff', '#efffff');
+        const explosionBloomSprite = createExplosionBloomSprite();
+        const starGlowSprite = createGlowSprite('#91bfff', '#ffffff');
+        // Ana topun ışığına ait yansıma dokusu: küçük, yumuşak ve düşük kontrastlı bir parlama.
+        // Boyutu ve görünürlüğü drawEnemyOrb içinde ışık kaynağına olan mesafeye göre hesaplanır.
+        const playerReflectionSprite = (() => {
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 64;
+            const sctx = sprite.getContext('2d');
+            const reflection = sctx.createRadialGradient(25, 23, 1, 25, 23, 30);
+            reflection.addColorStop(0, 'rgba(250,255,255,0.76)');
+            reflection.addColorStop(0.13, 'rgba(221,252,255,0.54)');
+            reflection.addColorStop(0.34, 'rgba(91,239,255,0.22)');
+            reflection.addColorStop(0.62, 'rgba(0,210,255,0.055)');
+            reflection.addColorStop(1, 'rgba(0,210,255,0)');
+            sctx.fillStyle = reflection;
+            sctx.fillRect(0, 0, 64, 64);
+            return sprite;
+        })();
+
+
+        let stars = [];
+        class Star {
+            constructor() { this.reset(true); }
+            reset(initial) {
+                this.x = Math.random() * cw;
+                this.y = initial ? Math.random() * ch : -10;
+                this.depth = Math.random();
+                this.size = 0.45 + this.depth * 1.05;
+                this.speed = 0.10 + this.depth * 0.42;
+                this.alpha = 0.20 + Math.random() * 0.48;
+                this.twinkleDir = Math.random() > 0.5 ? 0.01 : -0.01;
+            }
+            update(timeScale = 1) {
+                this.y += this.speed * timeScale;
+                this.alpha += this.twinkleDir * timeScale;
+                if(this.alpha > 0.8 || this.alpha < 0.2) this.twinkleDir *= -1;
+                if(this.y > ch + 10) this.reset(false);
+            }
+            draw() {
+                const glowSize = this.size * (3.2 + this.depth * 1.3);
+                ctx.globalAlpha = this.alpha * 0.72;
+                ctx.drawImage(starGlowSprite, this.x - glowSize / 2, this.y - glowSize / 2, glowSize, glowSize);
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#eaf6ff';
+                ctx.beginPath(); ctx.arc(this.x, this.y, Math.max(0.45, this.size * 0.58), 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+        function initStars() {
+            stars = [];
+            for(let i=0; i<104; i++) stars.push(new Star());
+        }
+        initStars();
+
+        function blendHex(a, b, amount) {
+            const parse = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
+            const ca = parse(a), cb = parse(b);
+            const mixed = ca.map((v, i) => Math.round(v + (cb[i] - v) * amount));
+            return `rgb(${mixed[0]}, ${mixed[1]}, ${mixed[2]})`;
+        }
+
+        // Oyun hızlandıkça arka plan yalnızca gece mavisi, lacivert ve mor tonlarına kayar.
+        // Yumuşak gradyan ayrı bir yüzeyde 15 FPS yenilenir; ana oyun her karede bu yüzeyi kopyalar.
+        function drawDynamicBackground(time, difficulty) {
+            const t = Math.max(0, Math.min(1, difficulty));
+            if (time - lastBackgroundRender >= 66 || Math.abs(t - lastBackgroundDifficulty) >= 0.012) {
+                const breathe = (Math.sin(time * 0.00022) + 1) * 0.5;
+                const low = ['#030610', '#071126', '#0b1830'];
+                const mid = ['#02040c', '#090f22', '#12142f'];
+                const high = ['#010208', '#09091b', '#17102d'];
+                const mix = (from, to, value) => from.map((color, i) => blendHex(color, to[i], value));
+                const stage = t < 0.58 ? mix(low, mid, t / 0.58) : mix(mid, high, (t - 0.58) / 0.42);
+                const gradient = backgroundCtx.createLinearGradient(0, 0, 0, ch);
+                gradient.addColorStop(0, stage[0]);
+                gradient.addColorStop(0.58, stage[1]);
+                gradient.addColorStop(1, stage[2]);
+                backgroundCtx.fillStyle = gradient;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+
+                const nebulaX = cw * (0.5 + Math.sin(time * 0.00012) * 0.12);
+                const nebulaY = ch * (0.43 + Math.cos(time * 0.0001) * 0.08);
+                const nebula = backgroundCtx.createRadialGradient(nebulaX, nebulaY, 0, nebulaX, nebulaY, Math.max(cw, ch) * 0.64);
+                const glowAlpha = 0.025 + t * 0.035 + breathe * 0.008;
+                nebula.addColorStop(0, `rgba(55, 58, 126, ${glowAlpha})`);
+                nebula.addColorStop(0.46, `rgba(35, 49, 110, ${glowAlpha * 0.42})`);
+                nebula.addColorStop(1, 'rgba(8, 10, 28, 0)');
+                backgroundCtx.fillStyle = nebula;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+
+                // Birbirinden uzak, düşük opaklıklı gaz bulutları sahneye derinlik verir.
+                const cloudA = backgroundCtx.createRadialGradient(cw * 0.16, ch * 0.30, 0, cw * 0.16, ch * 0.30, Math.max(cw, ch) * 0.42);
+                cloudA.addColorStop(0, `rgba(0, 166, 210, ${0.025 + breathe * 0.009})`);
+                cloudA.addColorStop(0.52, 'rgba(32, 83, 170, 0.018)');
+                cloudA.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                backgroundCtx.fillStyle = cloudA;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+                const cloudB = backgroundCtx.createRadialGradient(cw * 0.86, ch * 0.68, 0, cw * 0.86, ch * 0.68, Math.max(cw, ch) * 0.48);
+                cloudB.addColorStop(0, `rgba(116, 67, 220, ${0.026 + t * 0.014})`);
+                cloudB.addColorStop(0.55, 'rgba(62, 51, 150, 0.016)');
+                cloudB.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                backgroundCtx.fillStyle = cloudB;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+
+                // Çok hafif merkez ışığı ve kenar kararması: oynanabilir alanı öne çıkarır.
+                const centerBloom = backgroundCtx.createRadialGradient(cw * 0.5, ch * 0.50, 0, cw * 0.5, ch * 0.50, Math.max(cw, ch) * 0.55);
+                centerBloom.addColorStop(0, `rgba(45, 78, 155, ${0.035 + t * 0.018})`);
+                centerBloom.addColorStop(0.58, 'rgba(17, 25, 66, 0.018)');
+                centerBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                backgroundCtx.fillStyle = centerBloom;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+                const vignette = backgroundCtx.createRadialGradient(cw * 0.5, ch * 0.48, Math.min(cw, ch) * 0.18, cw * 0.5, ch * 0.48, Math.max(cw, ch) * 0.72);
+                vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                vignette.addColorStop(0.68, 'rgba(0, 0, 0, 0.08)');
+                vignette.addColorStop(1, 'rgba(0, 0, 0, 0.48)');
+                backgroundCtx.fillStyle = vignette;
+                backgroundCtx.fillRect(0, 0, cw, ch);
+                lastBackgroundRender = time;
+                lastBackgroundDifficulty = t;
+            }
+            ctx.drawImage(backgroundCanvas, 0, 0, cw, ch);
+        }
+
+        // Yörünge sade ve okunaklı tutulur; yalnızca tek bir yumuşak ışık çizgisi vardır.
+        function drawOrbitField(time, difficulty = 0) {
+            const pulse = 0.5 + 0.5 * Math.sin(time * 0.0011);
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = 'rgba(39, 143, 208, 0.105)';
+            ctx.lineWidth = 5.5;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, orbitRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(123, 205, 255, ${0.18 + pulse * 0.055 + difficulty * 0.025})`;
+            ctx.lineWidth = 1.15;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, orbitRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawPlayerOrb(x, y, time, materialize = 1) {
+            const pulse = 1 + Math.sin(time * 0.0055) * 0.035;
+            const auraSize = 70 * pulse * materialize;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.62;
+            ctx.drawImage(playerAuraSprite, x - auraSize / 2, y - auraSize / 2, auraSize, auraSize);
+            ctx.restore();
+            const spriteSize = 64 * materialize;
+            ctx.drawImage(playerSprite, x - spriteSize / 2, y - spriteSize / 2, spriteSize, spriteSize);
+        }
+
+        function drawEnemyOrb(enemy, time, lightX, lightY) {
+            const sprite = enemySpriteCache[enemy.color];
+            if (sprite) ctx.drawImage(sprite, enemy.x - 32, enemy.y - 32);
+
+            // Yansıma yalnızca ana top yeterince yakındayken görünür.
+            // Yaklaştıkça hem parlaklığı hem de yüzeyde kapladığı alan doğal biçimde artar.
+            if (!Number.isFinite(lightX) || !Number.isFinite(lightY)) return;
+
+            const dx = lightX - enemy.x;
+            const dy = lightY - enemy.y;
+            const distanceSquared = dx * dx + dy * dy;
+            const MAX_REFLECTION_DISTANCE = 230;
+            if (distanceSquared >= MAX_REFLECTION_DISTANCE * MAX_REFLECTION_DISTANCE) return;
+            const distance = Math.max(1, Math.sqrt(distanceSquared));
+            const FULL_REFLECTION_DISTANCE = 26;
+
+            // Uzakta tamamen sıfır; yakınlaştıkça yumuşak ease-in ile belirginleşir.
+            const proximity = Math.max(0, Math.min(1,
+                (MAX_REFLECTION_DISTANCE - distance) /
+                (MAX_REFLECTION_DISTANCE - FULL_REFLECTION_DISTANCE)
+            ));
+            if (proximity <= 0) return;
+
+            const falloff = proximity * proximity * (3 - 2 * proximity);
+            const intensity = Math.pow(falloff, 1.3) * 0.68;
+            if (intensity < 0.012) return;
+
+            const nx = dx / distance;
+            const ny = dy / distance;
+            const angle = Math.atan2(ny, nx);
+            const radius = enemy.size || 10;
+
+            // Yakın mesafede parlama büyür; uzakta küçük kalıp yumuşakça kaybolur.
+            // Önceki ölçülerde sprite'ın parlak merkezi küre içinde çok küçük kalıyordu.
+            // Genişletilmiş elips, küre sınırına clip edildiği için yüzey yansıması gibi görünür.
+            const reflectionWidth = radius * (1.95 + falloff * 1.25);
+            const reflectionHeight = radius * (1.55 + falloff * 0.95);
+            const reflectionX = enemy.x + nx * radius * (0.30 + falloff * 0.08);
+            const reflectionY = enemy.y + ny * radius * (0.30 + falloff * 0.08);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, radius * 0.96, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.globalCompositeOperation = 'screen';
+            ctx.globalAlpha = intensity;
+            ctx.translate(reflectionX, reflectionY);
+            ctx.rotate(angle);
+            ctx.drawImage(
+                playerReflectionSprite,
+                -reflectionWidth / 2,
+                -reflectionHeight / 2,
+                reflectionWidth,
+                reflectionHeight
+            );
+            ctx.restore();
+        }
+
+        // Parçacıklar için kullanılan küre sprite'ları renk başına bir kez oluşturulur.
+        // Her renk yalnızca bir kez hazırlanır; mobil cihazlarda çizim maliyeti düşüktür.
+        const effectPalette = ['#00e5ff', '#3478ff', '#7657ff', '#bd55ff', '#ff4d9d', '#ff873d', '#ffd447', '#39e6a4'];
+        const explosionPalette = ['#f4ffff', '#b8faff', '#55efff', '#19cfff', '#4d91ff', '#8172ff', '#bd8aff', '#f0a6ff'];
+        const trailPalette = ['#276b9b', '#3d58b7', '#6654c8', '#287eaa'];
+        const effectPaletteIndex = Object.create(null);
+        effectPalette.forEach((color, index) => { effectPaletteIndex[color] = index; });
+        const particleCache = {};
+        [...effectPalette, ...explosionPalette, ...trailPalette].forEach(color => {
+            if (particleCache[color]) return;
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 32;
+            const pCtx = sprite.getContext('2d');
+            const glow = pCtx.createRadialGradient(16, 16, 0.5, 16, 16, 16);
+            glow.addColorStop(0, colorToRgba('#ffffff', 0.92));
+            glow.addColorStop(0.18, colorToRgba(color, 0.88));
+            glow.addColorStop(0.48, colorToRgba(color, 0.42));
+            glow.addColorStop(0.78, colorToRgba(color, 0.10));
+            glow.addColorStop(1, colorToRgba(color, 0));
+            pCtx.fillStyle = glow;
+            pCtx.fillRect(0, 0, 32, 32);
+            particleCache[color] = sprite;
+        });
+
+        // Canlanma çekim parçacıkları renk/opaklık gruplarıyla toplu çizilir.
+        // Patlama parçacıkları ayrıca kopyalanmaz; ana Particle havuzu kullanılır.
+        const reviveFragmentBuckets = effectPalette.map(() => Array.from({ length: 4 }, () => []));
+        const reviveCoreGlowSprite = (() => {
+            const sprite = document.createElement('canvas');
+            sprite.width = sprite.height = 256;
+            const sctx = sprite.getContext('2d');
+            const glow = sctx.createRadialGradient(128, 128, 1, 128, 128, 128);
+            glow.addColorStop(0, 'rgba(213,255,255,.58)');
+            glow.addColorStop(0.18, 'rgba(0,229,255,.28)');
+            glow.addColorStop(0.55, 'rgba(91,117,255,.10)');
+            glow.addColorStop(1, 'rgba(40,70,180,0)');
+            sctx.fillStyle = glow;
+            sctx.fillRect(0, 0, 256, 256);
+            return sprite;
+        })();
+
+        let particles = [];
+        let trailParticles = [];
+        let impactFlashes = [];
+        let trailEmitTimer = 0;
+        const MAX_PARTICLES = 430;
+        const MAX_TRAIL_PARTICLES = 72;
+        // Patlama sırasında sık oluşturulup hemen atılan nesneler yeniden kullanılır.
+        // Fizik, ömür, boyut ve çizim değerleri her kullanımda baştan atanır.
+        const particlePool = [];
+        const MAX_PARTICLE_POOL = MAX_PARTICLES + MAX_TRAIL_PARTICLES;
+
+        function recycleParticle(particle) {
+            if (particle && particlePool.length < MAX_PARTICLE_POOL) particlePool.push(particle);
+        }
+
+        function clearParticleList(list) {
+            for (let i = 0; i < list.length; i++) recycleParticle(list[i]);
+            list.length = 0;
+        }
+
+        function trimParticleList(list, maxLength) {
+            const overflow = list.length - maxLength;
+            if (overflow <= 0) return;
+            for (let i = 0; i < overflow; i++) recycleParticle(list[i]);
+            list.splice(0, overflow);
+        }
+
+        class Particle {
+            constructor(x, y, color, kind = 'tap') {
+                this.reset(x, y, color, kind);
+            }
+
+            reset(x, y, color, kind = 'tap') {
+                this.x = x;
+                this.y = y;
+                this.kind = kind;
+                this.color = color || effectPalette[Math.floor(Math.random() * effectPalette.length)];
+                this.texture = particleCache[this.color] || particleCache['#00e5ff'];
+                // Canlanma patlaması, ölüm patlamasının 1.52x yakın kamera ölçüsünü
+                // kamera normal seviyeye dönmüş olsa bile aynı ekranda korur.
+                this.renderZoom = kind === 'death' && state === 'REVIVING' ? 1.52 : 1;
+                this.renderOriginX = this.renderZoom > 1 ? revivePosition.x : 0;
+                this.renderOriginY = this.renderZoom > 1 ? revivePosition.y : 0;
+
+                if (kind === 'trail') {
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.life = 0.58 + Math.random() * 0.18;
+                    this.decay = 0.042 + Math.random() * 0.014;
+                    this.size = 1.0 + Math.random() * 1.2;
+                    this.drag = 0.94 + Math.random() * 0.025;
+                    this.gravity = 0;
+                    this.shrink = 0.022;
+                    this.scale = 2.9;
+                    this.alphaMultiplier = 0.34;
+                    this.slowDrag = Math.pow(this.drag, 0.14);
+                    return;
+                }
+
+                const isDeath = kind === 'death';
+                const angle = Math.random() * Math.PI * 2;
+                const speed = isDeath ? 3.2 + Math.random() * 10.5 : 1.0 + Math.random() * 3.8;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = isDeath ? 0.9 + Math.random() * 0.42 : 0.62 + Math.random() * 0.28;
+                this.decay = isDeath ? 0.018 + Math.random() * 0.009 : 0.035 + Math.random() * 0.014;
+                this.size = isDeath ? 1.8 + Math.random() * 3.5 : 1.3 + Math.random() * 2.3;
+                this.drag = isDeath ? 0.982 + Math.random() * 0.012 : 0.952 + Math.random() * 0.03;
+                this.gravity = isDeath ? 0.075 + Math.random() * 0.045 : 0.018;
+                this.shrink = isDeath ? 0.009 + Math.random() * 0.008 : 0.025;
+                this.scale = isDeath ? 4.05 : 3.15;
+                this.alphaMultiplier = 0.98;
+                this.slowDrag = Math.pow(this.drag, 0.14);
+            }
+
+            update(timeScale = 1) {
+                this.x += this.vx * timeScale;
+                this.y += this.vy * timeScale;
+                this.vy += this.gravity * timeScale;
+                // Normal hızda üs alma gereksiz; ağır çekim katsayısı nesne hazırlanırken hesaplanır.
+                const dragFactor = timeScale === 1 ? this.drag :
+                    (timeScale === 0.14 ? this.slowDrag : Math.pow(this.drag, timeScale));
+                this.vx *= dragFactor;
+                this.vy *= dragFactor;
+                this.life -= this.decay * timeScale;
+                this.size = Math.max(0.2, this.size - this.shrink * timeScale);
+            }
+
+            draw() {
+                if (!this.texture || this.life <= 0) return;
+                ctx.globalAlpha = Math.max(0, Math.min(1, this.life)) * this.alphaMultiplier;
+                const zoom = this.renderZoom || 1;
+                const drawX = zoom > 1 ? cw / 2 + (this.x - this.renderOriginX) * zoom : this.x;
+                const drawY = zoom > 1 ? ch / 2 + (this.y - this.renderOriginY) * zoom : this.y;
+                const diameter = this.size * this.scale * zoom;
+                ctx.drawImage(this.texture, drawX - diameter / 2, drawY - diameter / 2, diameter, diameter);
+            }
+        }
+
+        function obtainParticle(x, y, color, kind = 'tap') {
+            const particle = particlePool.pop();
+            if (particle) {
+                particle.reset(x, y, color, kind);
+                return particle;
+            }
+            return new Particle(x, y, color, kind);
+        }
+
+        // İlk patlama ve ilk canlanma anında toplu nesne üretimini önceden tamamla.
+        // Oyun sırasında nesneler yalnızca havuzdan alınır ve geri bırakılır.
+        for (let i = 0; i < MAX_PARTICLE_POOL; i++) {
+            particlePool.push(Object.create(Particle.prototype));
+        }
+
+        function spawnImpactFlash(x, y, kind = 'tap') {
+            if (!visualEffectsEnabled) return;
+            const isDeath = kind === 'death';
+            impactFlashes.push({
+                x, y, kind,
+                start: performance.now(),
+                duration: isDeath ? 680 : 300
+            });
+            if (impactFlashes.length > 8) impactFlashes.shift();
+        }
+
+        function drawImpactFlashes(time) {
+            if (!impactFlashes.length) return;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let i = impactFlashes.length - 1; i >= 0; i--) {
+                const flash = impactFlashes[i];
+                const isReviveDeathFlash = state === 'REVIVING' && flash.kind === 'death';
+                if (isReviveDeathFlash) {
+                    const zoom = 1.52;
+                    ctx.save();
+                    ctx.translate(cw / 2 - revivePosition.x * zoom, ch / 2 - revivePosition.y * zoom);
+                    ctx.scale(zoom, zoom);
+                }
+                const elapsed = time - flash.start;
+                if (elapsed >= flash.duration) {
+                    impactFlashes.splice(i, 1);
+                    if (isReviveDeathFlash) ctx.restore();
+                    continue;
+                }
+
+                const isDeath = flash.kind === 'death';
+                const progress = Math.max(0, Math.min(1, elapsed / flash.duration));
+                const eased = 1 - Math.pow(1 - progress, 2.15);
+                const alpha = Math.pow(1 - progress, isDeath ? 1.65 : 2.0);
+                const size = isDeath
+                    ? 150 + eased * Math.min(Math.max(cw, ch) * 0.62, 520)
+                    : 54 + eased * 88;
+
+                // Tek bir yumuşak bloom: dış kenarı dağılarak kaybolur, halka çizmez.
+                ctx.globalAlpha = alpha * (isDeath ? 0.94 : 0.56);
+                ctx.drawImage(explosionBloomSprite, flash.x - size / 2, flash.y - size / 2, size, size);
+
+                // İlk birkaç karede kısa, yumuşak beyaz ışık vuruşu.
+                if (isDeath && elapsed < 105) {
+                    const coreProgress = elapsed / 105;
+                    const coreSize = 42 + coreProgress * 118;
+                    ctx.globalAlpha = (1 - coreProgress) * 0.86;
+                    ctx.drawImage(explosionBloomSprite, flash.x - coreSize / 2, flash.y - coreSize / 2, coreSize, coreSize);
+                    ctx.globalAlpha = (1 - coreProgress) * 0.11;
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.fillStyle = '#eaffff';
+                    ctx.fillRect(0, 0, cw, ch);
+                    ctx.globalCompositeOperation = 'lighter';
+                }
+                if (isReviveDeathFlash) ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        function createParticleBurst(x, y, kind = 'tap', options = {}) {
+            if (!visualEffectsEnabled) return;
+            const isDeath = kind === 'death';
+            if (options.flash !== false) spawnImpactFlash(x, y, kind);
+            if (isDeath && options.clearExisting !== false) {
+                clearParticleList(particles);
+                clearParticleList(trailParticles);
+            }
+
+            // Canlanma da ölümle aynı renk dokusunu, boyutu, fiziği ve ömrü kullanır.
+            // Sayı yalnızca düşman temizleme noktalarında daha küçük tutulur.
+            const count = Number.isFinite(options.count) ? Math.max(0, options.count) : (isDeath ? 310 : 26);
+            const palette = isDeath ? explosionPalette : effectPalette;
+            for (let i = 0; i < count && particles.length < MAX_PARTICLES; i++) {
+                const color = palette[Math.floor(Math.random() * palette.length)];
+                particles.push(obtainParticle(x, y, color, kind));
+            }
+        }
+
+        // Oyuncunun arkasında sağa-sola dalgalanan, yarı saydam mor-lacivert toplar.
+        function emitPlayerTrail(x, y, angle, direction, time) {
+            if (!visualEffectsEnabled) return;
+            const moveX = -Math.sin(angle) * direction;
+            const moveY = Math.cos(angle) * direction;
+            const backX = -moveX;
+            const backY = -moveY;
+            const sideX = -backY;
+            const sideY = backX;
+
+            for (let i = 0; i < 2; i++) {
+                if (trailParticles.length >= MAX_TRAIL_PARTICLES) break;
+                const phase = time * 0.012 + i * Math.PI;
+                const wave = Math.sin(phase) * (2.0 + i * 1.1);
+                const distance = 7 + i * 4.5;
+                const color = trailPalette[(Math.random() * trailPalette.length) | 0];
+                const particle = obtainParticle(
+                    x + backX * distance + sideX * wave,
+                    y + backY * distance + sideY * wave,
+                    color,
+                    'trail'
+                );
+                const drift = 0.35 + Math.random() * 0.35;
+                const sideDrift = Math.sin(phase + 0.55) * 0.28;
+                particle.vx = backX * drift + sideX * sideDrift + (Math.random() - 0.5) * 0.16;
+                particle.vy = backY * drift + sideY * sideDrift + (Math.random() - 0.5) * 0.16;
+                trailParticles.push(particle);
+            }
+        }
+
+        // ---------------------------------------------------------
+        // PIVOT MASTER AUDIO MANAGER
+        // Ses dosyaları önce sounds/, audio/, sesler/ klasörlerinde,
+        // ardından HTML dosyasıyla aynı klasörde aranır.
+        // ---------------------------------------------------------
+        const AUDIO_FOLDER_CANDIDATES = ['sounds/', 'audio/', 'sesler/', ''];
+        const MUSIC_TRACKS = {
+            menu: ['menu.mp3', 'menu2.mp3'],
+            game: ['game.mp3', 'game2.mp3']
+        };
+
+        let activeMusic = null;
+        let musicMode = null;
+        let musicGeneration = 0;
+        let musicLoopTimer = null;
+        let musicNextPending = false;
+        let lastMusicTrack = { menu: null, game: null };
+        let reviveMusicResumeTimer = null;
+        let reviveGameMusicPending = false;
+        const activeSoundEffects = new Map();
+
+        function createAudioAsset(fileName) {
+            const audio = new Audio();
+            let folderIndex = 0;
+            audio.preload = 'auto';
+            audio._wantsPlayback = false;
+            audio._fadeToken = 0;
+
+            const tryNextFolder = () => {
+                if (folderIndex >= AUDIO_FOLDER_CANDIDATES.length) {
+                    audio._wantsPlayback = false;
+                    console.warn(`Ses dosyası bulunamadı: ${fileName}`);
+                    return;
+                }
+                audio.src = `${AUDIO_FOLDER_CANDIDATES[folderIndex++]}${fileName}`;
+                audio.load();
+            };
+
+            audio.addEventListener('error', () => {
+                if (folderIndex < AUDIO_FOLDER_CANDIDATES.length) tryNextFolder();
+                else {
+                    audio._wantsPlayback = false;
+                    console.warn(`Ses dosyası yüklenemedi: ${fileName}`);
+                }
+            });
+
+            audio.addEventListener('canplay', () => {
+                if (audio._wantsPlayback && audio.paused) {
+                    const playPromise = audio.play();
+                    if (playPromise && typeof playPromise.catch === 'function') {
+                        playPromise.catch(() => {});
+                    }
+                }
+            });
+
+            tryNextFolder();
+            return audio;
+        }
+
+        // Yerel MP3'leri oyun başlamadan yüklemeye başla; özellikle start.mp3
+        // butona basıldığı anda gecikmesiz çalabilsin.
+        const preloadedAudioAssets = [
+            'menu.mp3', 'menu2.mp3', 'start.mp3',
+            'game.mp3', 'game2.mp3', 'bomb.mp3', 'charge.mp3'
+        ].map(fileName => createAudioAsset(fileName));
+
+        function requestAudioPlay(audio) {
+            if (!audio) return;
+            audio._wantsPlayback = true;
+            if (audio.readyState >= 2 && audio.paused) {
+                const playPromise = audio.play();
+                if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch(() => {});
+                }
+            }
+        }
+
+        function fadeAudioOut(audio, duration = 400, onComplete = null) {
+            if (!audio) {
+                if (onComplete) onComplete();
+                return;
+            }
+
+            const token = (audio._fadeToken || 0) + 1;
+            audio._fadeToken = token;
+            const startVolume = Number.isFinite(audio.volume) ? audio.volume : 1;
+            const startTime = performance.now();
+            const safeDuration = Math.max(0, duration);
+
+            const fadeFrame = (now) => {
+                if (audio._fadeToken !== token) return;
+                const progress = safeDuration === 0 ? 1 : Math.min(1, (now - startTime) / safeDuration);
+                audio.volume = Math.max(0, startVolume * (1 - progress));
+
+                if (progress < 1) {
+                    requestAnimationFrame(fadeFrame);
+                    return;
+                }
+
+                audio._wantsPlayback = false;
+                audio.pause();
+                try { audio.currentTime = 0; } catch (error) {}
+                if (onComplete) onComplete();
+            };
+
+            requestAnimationFrame(fadeFrame);
+        }
+
+        function canPlayMusicMode(mode) {
+            if (mode === 'menu') {
+                return state === 'MENU' || state === 'ACHIEVEMENTS' ||
+                    (state === 'SETTINGS' && previousState !== 'PAUSED');
+            }
+            return mode === 'game' && state === 'PLAY';
+        }
+
+        function chooseRandomTrack(mode) {
+            const tracks = MUSIC_TRACKS[mode];
+            if (!tracks || !tracks.length) return null;
+            let choices = tracks;
+            if (tracks.length > 1 && lastMusicTrack[mode]) {
+                choices = tracks.filter(track => track !== lastMusicTrack[mode]);
+            }
+            const chosen = choices[Math.floor(Math.random() * choices.length)];
+            lastMusicTrack[mode] = chosen;
+            return chosen;
+        }
+
+        function playNextMusicTrack(mode, generation = musicGeneration) {
+            if (generation !== musicGeneration || musicMode !== mode) return;
+            if (!canPlayMusicMode(mode)) {
+                musicNextPending = true;
+                return;
+            }
+
+            musicNextPending = false;
+            const fileName = chooseRandomTrack(mode);
+            if (!fileName) return;
+
+            const track = createAudioAsset(fileName);
+            track.volume = musicVolume / 100;
+            track.loop = false;
+            activeMusic = track;
+
+            track.addEventListener('ended', () => {
+                if (activeMusic !== track || generation !== musicGeneration || musicMode !== mode) return;
+                musicLoopTimer = setTimeout(() => {
+                    if (generation !== musicGeneration || musicMode !== mode) return;
+                    if (!canPlayMusicMode(mode)) {
+                        musicNextPending = true;
+                        return;
+                    }
+                    playNextMusicTrack(mode, generation);
+                }, 1000);
+            });
+
+            requestAudioPlay(track);
+        }
+
+        function startMusicLoop(mode, fadeDuration = 0) {
+            if (!MUSIC_TRACKS[mode]) return;
+            if (musicLoopTimer) {
+                clearTimeout(musicLoopTimer);
+                musicLoopTimer = null;
+            }
+
+            if (musicMode === mode && activeMusic && !activeMusic.ended) {
+                if (canPlayMusicMode(mode) && activeMusic.paused) requestAudioPlay(activeMusic);
+                return;
+            }
+
+            musicMode = mode;
+            const generation = ++musicGeneration;
+            musicNextPending = false;
+            const oldMusic = activeMusic;
+            activeMusic = null;
+
+            const beginNewTrack = () => {
+                if (generation === musicGeneration && musicMode === mode) {
+                    playNextMusicTrack(mode, generation);
+                }
+            };
+
+            if (oldMusic) fadeAudioOut(oldMusic, fadeDuration, beginNewTrack);
+            else beginNewTrack();
+        }
+
+        function stopMusicWithFade(duration = 500) {
+            musicMode = null;
+            musicGeneration++;
+            musicNextPending = false;
+            if (musicLoopTimer) {
+                clearTimeout(musicLoopTimer);
+                musicLoopTimer = null;
+            }
+
+            const oldMusic = activeMusic;
+            activeMusic = null;
+            if (oldMusic) fadeAudioOut(oldMusic, duration);
+        }
+
+        function pauseMusic() {
+            if (activeMusic) {
+                activeMusic._wantsPlayback = false;
+                activeMusic.pause();
+            }
+        }
+
+        function resumeMusic() {
+            if (musicMode !== 'game') return;
+            if (activeMusic && !activeMusic.ended) {
+                requestAudioPlay(activeMusic);
+            } else if (musicNextPending || !activeMusic) {
+                musicNextPending = false;
+                playNextMusicTrack('game', musicGeneration);
+            }
+        }
+
+        function playSoundEffect(fileName, options = {}) {
+            const volume = options.volume ?? 0.9;
+            const maxDuration = options.maxDuration ?? null;
+            stopSoundEffect(fileName, 70);
+
+            const effect = createAudioAsset(fileName);
+            effect.volume = Math.max(0, Math.min(1, volume));
+            activeSoundEffects.set(fileName, effect);
+
+            effect.addEventListener('ended', () => {
+                if (effect._maxDurationTimer) clearTimeout(effect._maxDurationTimer);
+                if (activeSoundEffects.get(fileName) === effect) {
+                    activeSoundEffects.delete(fileName);
+                }
+            });
+
+            if (maxDuration !== null) {
+                effect.addEventListener('playing', () => {
+                    if (effect._maxDurationTimer) clearTimeout(effect._maxDurationTimer);
+                    effect._maxDurationTimer = setTimeout(() => {
+                        if (activeSoundEffects.get(fileName) !== effect) return;
+                        fadeAudioOut(effect, 90, () => {
+                            if (activeSoundEffects.get(fileName) === effect) {
+                                activeSoundEffects.delete(fileName);
+                            }
+                        });
+                    }, Math.max(0, maxDuration));
+                }, { once: true });
+            }
+
+            requestAudioPlay(effect);
+            return effect;
+        }
+
+        function stopSoundEffect(fileName, fadeDuration = 0) {
+            const effect = activeSoundEffects.get(fileName);
+            if (!effect) return;
+            activeSoundEffects.delete(fileName);
+            if (effect._maxDurationTimer) clearTimeout(effect._maxDurationTimer);
+            fadeAudioOut(effect, fadeDuration);
+        }
+
+        function setMusicVolume(value) {
+            musicVolume = Math.max(0, Math.min(100, Number(value)));
+            if (activeMusic) activeMusic.volume = musicVolume / 100;
+            localStorage.setItem('pivotMusicVolume', String(musicVolume));
+            document.getElementById('musicVolumeValue').innerText = `${Math.round(musicVolume)}%`;
+        }
+
+        // Tarayıcı otomatik oynatmayı engellediyse ilk kullanıcı etkileşiminde
+        // menü müziğini yeniden başlatmayı dener.
+        document.addEventListener('pointerdown', () => {
+            if (activeMusic && activeMusic.paused && musicMode && canPlayMusicMode(musicMode)) {
+                requestAudioPlay(activeMusic);
+            } else if (!activeMusic && musicMode && canPlayMusicMode(musicMode)) {
+                playNextMusicTrack(musicMode, musicGeneration);
+            }
+        }, { passive: true });
+
+        // Kayıtlı ses düzeyini ayarlar ekranına uygula.
+        document.getElementById('musicVolume').value = musicVolume;
+        document.getElementById('musicVolumeValue').innerText = `${Math.round(musicVolume)}%`;
+
+        function refreshEffectsButton() {
+            const button = document.getElementById('effectsToggleBtn');
+            button.innerText = `PARTICLE EFFECTS: ${visualEffectsEnabled ? 'ON' : 'OFF'}`;
+            button.classList.toggle('is-off', !visualEffectsEnabled);
+        }
+        function toggleVisualEffects() {
+            visualEffectsEnabled = !visualEffectsEnabled;
+            localStorage.setItem('pivotVisualEffects', String(visualEffectsEnabled));
+            if (!visualEffectsEnabled) {
+                clearParticleList(particles);
+                clearParticleList(trailParticles);
+                impactFlashes.length = 0;
+                reviveFragments.length = 0;
+            }
+            refreshEffectsButton();
+        }
+        refreshEffectsButton();
+
+        function refreshVibrationButton() {
+            const button = document.getElementById('vibrationToggleBtn');
+            button.innerText = `VIBRATION: ${vibrationEnabled ? 'ON' : 'OFF'}`;
+            button.classList.toggle('is-off', !vibrationEnabled);
+        }
+        function toggleVibration() {
+            vibrationEnabled = !vibrationEnabled;
+            localStorage.setItem('pivotVibrationEnabled', String(vibrationEnabled));
+            if (!vibrationEnabled && typeof navigator.vibrate === 'function') {
+                navigator.vibrate(0);
+            }
+            refreshVibrationButton();
+        }
+        function triggerDeathVibration() {
+            if (!vibrationEnabled || typeof navigator.vibrate !== 'function') return;
+            try {
+                navigator.vibrate(180); // Patlamayla senkron, biraz daha uzun tek darbeli titreşim.
+            } catch (error) {
+                // Titreşim desteklenmiyorsa oyun normal şekilde devam eder.
+            }
+        }
+        refreshVibrationButton();
+
+        function pulseLiveScore() {
+            const scoreElement = document.getElementById('liveScore');
+            scoreElement.classList.remove('score-combo-hit');
+            void scoreElement.offsetWidth;
+            scoreElement.classList.add('score-combo-hit');
+        }
+
+        function comboTier(level) {
+            if (level >= 4) return 4;
+            if (level === 3) return 3;
+            if (level === 2) return 2;
+            return 1;
+        }
+
+        function showNearMissFloat(x, y, points, level) {
+            const layer = document.getElementById('floatingEffects');
+            const label = document.createElement('div');
+            label.className = `combo-float combo-tier-${comboTier(level)}`;
+            label.textContent = `+${points}`;
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+            layer.appendChild(label);
+            setTimeout(() => label.remove(), 950);
+        }
+
+        function spawnComboSparks(level) {
+            if (!visualEffectsEnabled) return;
+            const layer = document.getElementById('floatingEffects');
+            const palette = level >= 3
+                ? ['#ffe28a', '#ffc247', '#fff0bd']
+                : level === 2 ? ['#ff5968', '#ff9aa1', '#ffd0d3'] : ['#ff5364', '#ff8791'];
+            const originX = cw / 2;
+            const originY = 153;
+            const count = level >= 3 ? 13 : 8;
+            for (let i = 0; i < count; i++) {
+                const spark = document.createElement('span');
+                const angle = (Math.PI * 2 * i / count) + (Math.random() - .5) * .35;
+                const distance = 18 + Math.random() * (level >= 3 ? 39 : 26);
+                spark.className = 'combo-spark';
+                spark.style.left = `${originX}px`;
+                spark.style.top = `${originY}px`;
+                spark.style.background = palette[(Math.random() * palette.length) | 0];
+                spark.style.boxShadow = `0 0 9px ${spark.style.background}`;
+                spark.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+                spark.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+                layer.appendChild(spark);
+                setTimeout(() => spark.remove(), 680);
+            }
+        }
+
+        function refreshComboHud() {
+            const hud = document.getElementById('comboHud');
+            if (comboCount <= 0) return;
+            hud.classList.remove('hidden');
+            const tier = comboTier(comboCount);
+            if (!hud.classList.contains(`combo-tier-${tier}`)) {
+                hud.classList.remove('combo-tier-1', 'combo-tier-2', 'combo-tier-3', 'combo-tier-4');
+                hud.classList.add(`combo-tier-${tier}`);
+            }
+            document.getElementById('comboLevel').textContent = `COMBO ×${comboCount}`;
+            document.getElementById('comboPending').textContent = `+${comboBonusPending}`;
+
+            // Yazı, kalan combo süresiyle aynı oranda yavaşça silinir ve hafifçe yukarı süzülür.
+            const ratio = Math.max(0, Math.min(1, comboTimer / COMBO_WINDOW_MS));
+            const opacity = Math.pow(ratio, .9);
+            hud.style.opacity = opacity.toFixed(3);
+            hud.style.transform = `translate(-50%, ${7 * (1 - ratio)}px) scale(${.97 + ratio * .03})`;
+            hud.style.filter = `blur(${(1 - ratio) * 2.2}px)`;
+        }
+
+        function renewComboText() {
+            const hud = document.getElementById('comboHud');
+            hud.classList.remove('combo-renew');
+            void hud.offsetWidth;
+            hud.classList.add('combo-renew');
+        }
+
+        function registerNearMiss(enemy) {
+            // 1. geçiş +5, 2. geçiş +6... her geçiş en fazla +10 puan verir.
+            const points = Math.min(10, 5 + comboCount);
+            comboCount++;
+            comboBonusPending += points;
+            comboTimer = COMBO_WINDOW_MS;
+            comboBestThisRun = Math.max(comboBestThisRun, comboCount);
+            comboBonusThisRun += points;
+
+            refreshComboHud();
+            renewComboText();
+            spawnComboSparks(comboCount);
+            pulseLiveScore();
+            showNearMissFloat(enemy.x, enemy.y, points, comboCount);
+
+            if (visualEffectsEnabled) {
+                spawnImpactFlash(enemy.x, enemy.y, 'nearMiss');
+                for (let i = 0; i < 11; i++) {
+                    const color = effectPalette[(Math.random() * effectPalette.length) | 0];
+                    particles.push(obtainParticle(enemy.x, enemy.y, color, 'tap'));
+                }
+                trimParticleList(particles, MAX_PARTICLES);
+            }
+        }
+
+        function animateScoreBank(previousScore, newScore, bonus) {
+            const liveScore = document.getElementById('liveScore');
+            const visibleScore = Number(liveScore.textContent);
+            scoreCountAnimation = {
+                from: Number.isFinite(visibleScore) ? visibleScore : previousScore,
+                to: newScore,
+                start: performance.now(),
+                duration: 820
+            };
+            const gain = document.getElementById('scoreGain');
+            gain.textContent = `COMBO BANKED  +${bonus}`;
+            gain.classList.remove('show');
+            void gain.offsetWidth;
+            gain.classList.add('show');
+            pulseLiveScore();
+        }
+
+        function updateScoreCounter(time) {
+            const liveScore = document.getElementById('liveScore');
+            if (!scoreCountAnimation) {
+                liveScore.textContent = score;
+                return;
+            }
+            const anim = scoreCountAnimation;
+            const progress = Math.max(0, Math.min(1, (time - anim.start) / anim.duration));
+            const eased = 1 - Math.pow(1 - progress, 3);
+            liveScore.textContent = Math.round(anim.from + (anim.to - anim.from) * eased);
+            if (progress >= 1) {
+                liveScore.textContent = score;
+                scoreCountAnimation = null;
+            }
+        }
+
+        function finishCombo() {
+            if (comboCount <= 0 || comboBonusPending <= 0) return;
+            const chainLength = comboCount;
+            const bonus = comboBonusPending;
+            const previousScore = score;
+            score += bonus;
+
+            // Combo bonus bir anda kaybolmaz: skor sayacı artışı animasyonla gösterilir.
+            for (let milestone = previousScore + 1; milestone <= score; milestone++) checkAchievements(milestone);
+            animateScoreBank(previousScore, score, bonus);
+
+            comboCount = 0;
+            comboBonusPending = 0;
+            comboTimer = 0;
+            const hud = document.getElementById('comboHud');
+            hud.style.opacity = '0';
+            setTimeout(() => {
+                if (comboCount === 0) {
+                    hud.classList.add('hidden');
+                    hud.classList.remove('combo-renew', 'combo-tier-1', 'combo-tier-2', 'combo-tier-3', 'combo-tier-4');
+                    hud.style.opacity = '';
+                    hud.style.transform = '';
+                    hud.style.filter = '';
+                }
+            }, 140);
+        }
+
+        function runAchievementToastQueue() {
+            if (achievementToastBusy || achievementQueue.length === 0) return;
+            achievementToastBusy = true;
+            const ach = achievementQueue.shift();
+            const notification = document.getElementById('achNotification');
+            document.getElementById('notifyTitle').textContent = ach.title;
+            document.getElementById('notifyDesc').textContent = ach.desc;
+            notification.classList.remove('show-notify');
+            void notification.offsetWidth;
+            notification.classList.add('show-notify');
+            setTimeout(() => {
+                notification.classList.remove('show-notify');
+                setTimeout(() => {
+                    achievementToastBusy = false;
+                    runAchievementToastQueue();
+                }, 360);
+            }, 2600);
+        }
+
+        const achievementMilestones = [
+            { score: 10, title: "Getting Started", desc: "Reach 10 Points" }, { score: 20, title: "Spark", desc: "Reach 20 Points" },
+            { score: 30, title: "Warming Up", desc: "Reach 30 Points" }, { score: 60, title: "Skillful", desc: "Reach 60 Points" },
+            { score: 80, title: "Flow", desc: "Reach 80 Points" }, { score: 90, title: "On Fire", desc: "Reach 90 Points" },
+            { score: 100, title: "Pivot Master", desc: "Reach 100 Points" }, { score: 125, title: "Elite", desc: "Reach 125 Points" },
+            { score: 150, title: "Pro", desc: "Reach 150 Points" }, { score: 175, title: "Veteran", desc: "Reach 175 Points" },
+            { score: 200, title: "Reflex King", desc: "Reach 200 Points" }, { score: 250, title: "Quarter Legend", desc: "Reach 250 Points" },
+            { score: 300, title: "Insane", desc: "Reach 300 Points" }, { score: 350, title: "Hyper Focus", desc: "Reach 350 Points" },
+            { score: 400, title: "Matrix", desc: "Reach 400 Points" }, { score: 450, title: "Ascended", desc: "Reach 450 Points" },
+            { score: 500, title: "Neon God", desc: "Reach 500 Points" }, { score: 600, title: "Unstoppable", desc: "Reach 600 Points" },
+            { score: 700, title: "Immortal", desc: "Reach 700 Points" }, { score: 800, title: "Galaxy Brain", desc: "Reach 800 Points" },
+            { score: 900, title: "Dimensional", desc: "Reach 900 Points" }, { score: 1000, title: "L E G E N D", desc: "Reach 1000 Points" },
+            { score: 1250, title: "Master of Space", desc: "Reach 1250 Points" }, { score: 1500, title: "Time Bender", desc: "Reach 1500 Points" },
+            { score: 2000, title: "Grand Master", desc: "Reach 2000 Points" }, { score: 2500, title: "Absolute", desc: "Reach 2500 Points" },
+            { score: 3000, title: "Beyond Reality", desc: "Reach 3000 Points" }, { score: 4000, title: "Infinity", desc: "Reach 4000 Points" },
+            { score: 5000, title: "OMEGA", desc: "Reach 5000 Points" }
+        ];
+        let unlockedAchievements = JSON.parse(localStorage.getItem('unlockedAchievements')) || [];
+
+        function checkAchievements(s) {
+            const ach = achievementMilestones.find(a => a.score === s);
+            if (ach && !unlockedAchievements.includes(ach.score)) {
+                unlockedAchievements.push(ach.score);
+                localStorage.setItem('unlockedAchievements', JSON.stringify(unlockedAchievements));
+                achievementQueue.push(ach);
+                runAchievementToastQueue();
+            }
+        }
+
+        function hideAll() { 
+            document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden')); 
+            document.getElementById('pauseBtn').classList.add('hidden'); 
+            document.getElementById('liveScore').classList.add('hidden'); 
+        }
+        function showMenu() { 
+            hideAll();
+            // Menüye dönülürken ekranda kalan combo yazısını ve geçici combo efektlerini temizle.
+            comboCount = 0;
+            comboBonusPending = 0;
+            comboTimer = 0;
+            const comboHud = document.getElementById('comboHud');
+            comboHud.classList.add('hidden');
+            comboHud.classList.remove('combo-renew', 'combo-tier-1', 'combo-tier-2', 'combo-tier-3', 'combo-tier-4');
+            comboHud.style.opacity = '';
+            comboHud.style.transform = '';
+            comboHud.style.filter = '';
+            document.querySelectorAll('#floatingEffects .combo-float, #floatingEffects .combo-spark').forEach(effect => effect.remove());
+
+            state = 'MENU'; 
+            document.getElementById('mainMenu').classList.remove('hidden'); 
+            document.getElementById('bestDisplay').innerText = `BEST: ${bestScore}`; 
+            stopSoundEffect('bomb.mp3', 180);
+            startMusicLoop('menu', 450);
+        }
+        function showSettings(fromState = 'MENU') { 
+            hideAll(); state = 'SETTINGS'; previousState = fromState; 
+            document.getElementById('settingsMenu').classList.remove('hidden'); 
+        }
+        function goBackFromSettings() {
+            if (previousState === 'PAUSED') { hideAll(); state = 'PAUSED'; document.getElementById('pauseMenu').classList.remove('hidden'); } 
+            else { showMenu(); }
+        }
+        function showAchievements() {
+            hideAll(); state = 'ACHIEVEMENTS';
+            const list = document.getElementById('achievementsList'); list.innerHTML = '';
+            achievementMilestones.forEach(ach => {
+                const isUn = unlockedAchievements.includes(ach.score);
+                list.innerHTML += `<div class="achievement-item ${isUn ? 'ach-unlocked' : 'ach-locked'}">
+                    <div><div class="ach-title">${ach.title} (${ach.score})</div><small>${ach.desc}</small></div>
+                    <div style="font-size:20px">${isUn ? '🏆' : '🔒'}</div>
+                </div>`;
+            });
+            document.getElementById('achievementsMenu').classList.remove('hidden');
+        }
+
+        function startGame() { 
+            stopMusicWithFade(550);
+            stopSoundEffect('bomb.mp3', 120);
+            stopSoundEffect('charge.mp3', 100);
+            if (reviveMusicResumeTimer) {
+                clearTimeout(reviveMusicResumeTimer);
+                reviveMusicResumeTimer = null;
+            }
+            reviveGameMusicPending = false;
+            playSoundEffect('start.mp3', { volume: 0.82 });
+            hideAll(); 
+            state = 'WAITING';
+            score = 0; enemies = []; clearParticleList(particles); clearParticleList(trailParticles); impactFlashes = []; trailEmitTimer = 0; enemyTimer = 0;
+            elapsedRunTimeMs = 0; difficultyLevel = 0;
+            deathCinematicStart = null; deathPhaseStart = null; deathPhase = null; deathWasNewRecord = false;
+            reviveUsedThisRun = false;
+            reviveStartTime = null; reviveFragments = [];
+            reviveShockwaveStart = null; reviveShockwaveRadius = 0;
+            reviveShockwaveMaxRadius = 0; reviveShockwaveStarted = false;
+            comboCount = 0; comboBonusPending = 0; comboTimer = 0; comboBestThisRun = 0; comboBonusThisRun = 0; scoreCountAnimation = null;
+            const comboHud = document.getElementById('comboHud');
+            comboHud.classList.add('hidden');
+            comboHud.classList.remove('combo-renew', 'combo-tier-1', 'combo-tier-2', 'combo-tier-3', 'combo-tier-4');
+            comboHud.style.opacity = '';
+            comboHud.style.transform = '';
+            comboHud.style.filter = '';
+            document.getElementById('scoreGain').classList.remove('show');
+            document.getElementById('gameOver').classList.remove('gameover-enter');
+            document.body.classList.remove('death-screen-shake'); initStars(); 
+            
+            document.getElementById('tapStart').classList.remove('hidden'); 
+            document.getElementById('tapHint').innerText = "TAP TO PIVOT"; 
+            document.getElementById('liveScore').innerText = "0";
+            document.getElementById('liveScore').classList.remove('score-combo-hit');
+            document.getElementById('liveScore').classList.add('hidden'); 
+            document.getElementById('pauseBtn').classList.remove('hidden'); 
+
+        }
+
+        function togglePause() { 
+            if(state === 'PLAY') { state = 'PAUSED'; hideAll(); document.getElementById('pauseMenu').classList.remove('hidden'); pauseMusic(); } 
+        }
+        function resumeGame() { 
+            state = 'PLAY'; document.getElementById('pauseMenu').classList.add('hidden'); document.getElementById('pauseBtn').classList.remove('hidden'); document.getElementById('liveScore').classList.remove('hidden'); lastUpdate = performance.now(); 
+            resumeMusic(); 
+        }
+        function quitToMenu() { showMenu(); }
+
+        function checkInterstitialAd() {
+            if (deathCounter > 0 && deathCounter % 5 === 0) { console.log("5. ÖLÜM - GEÇİŞ REKLAMI GÖSTERİLİYOR"); }
+        }
+
+        function requestRevive() {
+            if (state !== 'GAMEOVER' || reviveUsedThisRun) return;
+
+            // REWARDED AD ENTEGRASYON NOKTASI:
+            // Reklam SDK'sı eklendiğinde, reklam başarıyla tamamlanınca beginRevive() çağrılmalı.
+            // Şimdilik reklam atlanır ve butona basıldığı anda devam hakkı verilir.
+            beginRevive();
+        }
+
+        function beginRevive() {
+            if (state !== 'GAMEOVER' || reviveUsedThisRun) return;
+
+            reviveUsedThisRun = true;
+            stopSoundEffect('bomb.mp3', 100);
+            playSoundEffect('charge.mp3', { volume: 0.88 });
+            reviveGameMusicPending = false;
+            if (reviveMusicResumeTimer) {
+                clearTimeout(reviveMusicResumeTimer);
+                reviveMusicResumeTimer = null;
+            }
+            revivePosition.x = deathPosition.x;
+            revivePosition.y = deathPosition.y;
+            reviveStartTime = performance.now();
+            reviveShockwaveStart = null;
+            reviveShockwaveRadius = 0;
+            reviveShockwaveMaxRadius = Math.hypot(
+                Math.max(revivePosition.x, cw - revivePosition.x) + 70,
+                Math.max(revivePosition.y, ch - revivePosition.y) + 70
+            );
+            reviveShockwaveStarted = false;
+            document.body.classList.remove('death-screen-shake');
+            clearParticleList(particles);
+            clearParticleList(trailParticles);
+
+            // Parçalar tüm oyun alanından, ölen oyuncunun konumuna doğru çekilir.
+            const fragmentCount = visualEffectsEnabled ? 132 : 0;
+            reviveFragments = [];
+            for (let i = 0; i < fragmentCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 55 + Math.random() * Math.max(cw, ch) * 0.58;
+                const startX = Math.max(-12, Math.min(cw + 12, revivePosition.x + Math.cos(angle) * distance));
+                const startY = Math.max(-12, Math.min(ch + 12, revivePosition.y + Math.sin(angle) * distance));
+                const dx = revivePosition.x - startX;
+                const dy = revivePosition.y - startY;
+                const length = Math.max(1, Math.hypot(dx, dy));
+                reviveFragments.push({
+                    x: startX, y: startY, previousX: startX, previousY: startY,
+                    startX, startY, dx, dy,
+                    perpendicularX: -dy / length, perpendicularY: dx / length,
+                    delay: Math.random() * 260,
+                    phase: Math.random() * Math.PI * 2,
+                    // Ölüm patlamasındaki parçacıklarla aynı başlangıç boyut aralığı.
+                    size: 1.8 + Math.random() * 3.5,
+                    color: effectPalette[(Math.random() * effectPalette.length) | 0],
+                    progress: 0, renderAlpha: 0
+                });
+            }
+
+            hideAll();
+            document.getElementById('gameOver').classList.add('hidden');
+            document.getElementById('gameOver').classList.remove('gameover-enter');
+            document.getElementById('liveScore').classList.remove('hidden');
+            document.getElementById('tapStart').classList.add('hidden');
+            document.body.classList.remove('death-screen-shake');
+            state = 'REVIVING';
+            lastUpdate = reviveStartTime;
+        }
+
+        function triggerReviveVibration() {
+            if (!vibrationEnabled || typeof navigator.vibrate !== 'function') return;
+            try {
+                navigator.vibrate([55, 35, 125]);
+            } catch (error) {
+                // Desteklenmeyen titreşim desenlerinde oyun etkilenmez.
+            }
+        }
+
+        function updateReviveSequence(time) {
+            if (state !== 'REVIVING' || reviveStartTime === null) return;
+            const elapsed = time - reviveStartTime;
+
+            if (elapsed < REVIVE_PULL_DURATION) {
+                for (const fragment of reviveFragments) {
+                    const localProgress = Math.max(0, Math.min(1,
+                        (elapsed - fragment.delay) / Math.max(1, REVIVE_PULL_DURATION - fragment.delay)
+                    ));
+                    const eased = 1 - Math.pow(1 - localProgress, 2.35);
+                    const swirl = Math.sin(localProgress * Math.PI * 3.2 + fragment.phase) * (1 - eased) * 31;
+                    fragment.previousX = fragment.x;
+                    fragment.previousY = fragment.y;
+                    fragment.progress = localProgress;
+                    fragment.renderAlpha = Math.min(1, 0.18 + localProgress * 1.25) * (1 - localProgress * 0.35);
+                    fragment.x = fragment.startX + fragment.dx * eased + fragment.perpendicularX * swirl;
+                    fragment.y = fragment.startY + fragment.dy * eased + fragment.perpendicularY * swirl;
+                }
+                return;
+            }
+
+            if (!reviveShockwaveStarted) {
+                reviveShockwaveStarted = true;
+                reviveShockwaveStart = time;
+                stopSoundEffect('charge.mp3', 100);
+                playSoundEffect('bomb.mp3', { volume: 1, maxDuration: 1000 });
+                if (reviveMusicResumeTimer) clearTimeout(reviveMusicResumeTimer);
+                reviveMusicResumeTimer = setTimeout(() => {
+                    reviveMusicResumeTimer = null;
+                    if (state === 'PLAY') startMusicLoop('game', 100);
+                    else reviveGameMusicPending = true;
+                }, 1000);
+                document.body.classList.remove('death-screen-shake');
+                void document.body.offsetWidth;
+                document.body.classList.add('death-screen-shake');
+                triggerReviveVibration();
+                createParticleBurst(revivePosition.x, revivePosition.y, 'death', { count: 310, clearExisting: false });
+                reviveFragments.length = 0;
+            }
+
+            const waveElapsed = time - reviveShockwaveStart;
+            const waveProgress = Math.max(0, Math.min(1, waveElapsed / REVIVE_WAVE_DURATION));
+            const easedWave = 1 - Math.pow(1 - waveProgress, 3.15);
+            const previousRadius = reviveShockwaveRadius;
+            reviveShockwaveRadius = reviveShockwaveMaxRadius * easedWave;
+
+            // Dalga her düşman topuna ulaştığında onu kendi konumunda parçacıklarla temizler.
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const distance = Math.hypot(enemy.x - revivePosition.x, enemy.y - revivePosition.y);
+                if (distance <= reviveShockwaveRadius + 8 && distance >= previousRadius - 24) {
+                    createParticleBurst(enemy.x, enemy.y, 'death', { count: 13, clearExisting: false, flash: false });
+                    enemies.splice(i, 1);
+                }
+            }
+
+            if (waveProgress >= 1 && waveElapsed >= REVIVE_WAVE_DURATION + 120) {
+                enemies.length = 0; // Ekranda kalan olası sınır dışı düşmanları da temizle.
+                reviveFragments.length = 0;
+                reviveStartTime = null;
+                reviveShockwaveStart = null;
+                reviveShockwaveStarted = false;
+                reviveShockwaveRadius = 0;
+                reviveShockwaveMaxRadius = 0;
+                enemyTimer = 0; // Yeniden doğar doğmaz yeni düşman belirmesin.
+                state = 'PLAY';
+                lastUpdate = time;
+                document.getElementById('pauseBtn').classList.remove('hidden');
+                document.getElementById('liveScore').classList.remove('hidden');
+                if (reviveGameMusicPending) {
+                    reviveGameMusicPending = false;
+                    startMusicLoop('game', 100);
+                }
+            }
+        }
+
+        function drawReviveEffects(time) {
+            if (state !== 'REVIVING' || reviveStartTime === null) return;
+            const elapsed = time - reviveStartTime;
+            const x = revivePosition.x;
+            const y = revivePosition.y;
+            // Ölüm parçacıkları 1.52x yakın kamerada görünür. Yeniden doğma kamerası
+            // açıldıkça parçacıkları aynı ekrandaki boyutta tutmak için bu farkı telafi et.
+            const cameraProgress = Math.max(0, Math.min(1, elapsed / 720));
+            const cameraEase = 1 - Math.pow(1 - cameraProgress, 3);
+            const reviveCameraZoom = 1.52 - 0.52 * cameraEase;
+            const fragmentScreenScale = 1.52 / reviveCameraZoom;
+
+            if (elapsed < REVIVE_PULL_DURATION) {
+                const progress = Math.max(0, Math.min(1, elapsed / REVIVE_PULL_DURATION));
+                const pulse = 0.5 + 0.5 * Math.sin(time * 0.012);
+                const glowSize = (92 + progress * 34) * 2;
+
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                ctx.globalAlpha = 0.68 + progress * 0.16;
+                ctx.drawImage(reviveCoreGlowSprite, x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
+
+                // Efekt ayarı kapalıysa canlanma çekim parçacıkları da çizilmez.
+                if (visualEffectsEnabled) {
+                    // Aynı renk ve opaklık seviyesindeki parçacık izleri tek path içinde çizilir.
+                    for (const colorBuckets of reviveFragmentBuckets) {
+                        for (const bucket of colorBuckets) bucket.length = 0;
+                    }
+                    for (const fragment of reviveFragments) {
+                        const alpha = fragment.renderAlpha;
+                        if (alpha <= 0.02) continue;
+                        const colorIndex = effectPaletteIndex[fragment.color];
+                        if (colorIndex < 0) continue;
+                        const alphaBand = Math.min(3, Math.max(0, (alpha * 4) | 0));
+                        reviveFragmentBuckets[colorIndex][alphaBand].push(fragment);
+                    }
+    
+                    ctx.globalCompositeOperation = 'lighter';
+                    for (let c = 0; c < reviveFragmentBuckets.length; c++) {
+                        const colorBuckets = reviveFragmentBuckets[c];
+                        const color = effectPalette[c];
+                        // Ölüm patlamasında kullanılan aynı düz parçacık dokusu.
+                        const sprite = particleCache[color];
+                        for (let band = 0; band < colorBuckets.length; band++) {
+                            const bucket = colorBuckets[band];
+                            if (!bucket.length) continue;
+                            ctx.globalAlpha = (band + 0.5) / 4;
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 1.8 * fragmentScreenScale;
+                            ctx.beginPath();
+                            for (let j = 0; j < bucket.length; j++) {
+                                const fragment = bucket[j];
+                                ctx.moveTo(fragment.previousX, fragment.previousY);
+                                ctx.lineTo(fragment.x, fragment.y);
+                            }
+                            ctx.stroke();
+                            for (let j = 0; j < bucket.length; j++) {
+                                const fragment = bucket[j];
+                                // Particle.draw() ile aynı ölçek: iki animasyonda da aynı boyut.
+                                const size = fragment.size * 2.25 * fragmentScreenScale;
+                                ctx.drawImage(sprite, fragment.x - size / 2, fragment.y - size / 2, size, size);
+                            }
+                        }
+                    }
+                }
+                ctx.restore();
+                return;
+            }
+
+            const waveElapsed = reviveShockwaveStart === null ? 0 : time - reviveShockwaveStart;
+            const progress = Math.max(0, Math.min(1, waveElapsed / REVIVE_WAVE_DURATION));
+            const alpha = (1 - progress) * 0.9;
+            if (reviveShockwaveStart !== null) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = alpha;
+                ctx.lineCap = 'round';
+
+                // Orijinal canlanma dalgası: geniş cyan ana halka, iç enerji hattı ve mor dış kenar.
+                ctx.strokeStyle = 'rgba(65,235,255,.22)';
+                ctx.lineWidth = 17 * (1 - progress) + 5;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(1, reviveShockwaveRadius), 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.strokeStyle = '#d9ffff';
+                ctx.lineWidth = 3.5 + (1 - progress) * 8;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(1, reviveShockwaveRadius), 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(54,223,255,.24)';
+                ctx.lineWidth = 12 * (1 - progress) + 5;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(1, reviveShockwaveRadius - 12), 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.strokeStyle = '#36dfff';
+                ctx.globalAlpha = alpha * 0.94;
+                ctx.lineWidth = 12 * (1 - progress) + 2;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(1, reviveShockwaveRadius - 12), 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.strokeStyle = 'rgba(177,151,255,.92)';
+                ctx.lineWidth = 2 + (1 - progress) * 3;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(1, reviveShockwaveRadius + 12), 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 24 küçük enerji çizgisi aynı path gruplarıyla performanslı çizilir.
+                const inner = Math.max(0, reviveShockwaveRadius - 5);
+                const tickRotation = time * 0.00022;
+                ctx.globalAlpha = alpha;
+                ctx.strokeStyle = '#c9ffff';
+                ctx.lineWidth = 1.7;
+                ctx.beginPath();
+                for (let i = 0; i < 24; i += 2) {
+                    const angle = (i / 24) * Math.PI * 2 + tickRotation;
+                    const outer = reviveShockwaveRadius + 13 + (i % 4) * 5;
+                    ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+                    ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
+                }
+                ctx.stroke();
+                ctx.strokeStyle = '#8b9cff';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                for (let i = 1; i < 24; i += 2) {
+                    const angle = (i / 24) * Math.PI * 2 + tickRotation;
+                    const outer = reviveShockwaveRadius + 13 + (i % 4) * 5;
+                    ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+                    ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
+                }
+                ctx.stroke();
+                ctx.restore();
+
+                // Dalganın merkezinden gelen kısa ekran ışığı da yalnızca canlanmada görünür.
+                if (waveElapsed < 170) {
+                    const flashAlpha = (1 - waveElapsed / 170) * 0.18;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.globalAlpha = flashAlpha;
+                    ctx.fillStyle = '#b9f5ff';
+                    ctx.fillRect(0, 0, cw, ch);
+                    ctx.restore();
+                }
+            }
+
+            // Küre, geri gelen enerji dalgasının merkezinde yeniden bütünleşir.
+            const materialize = Math.max(0, Math.min(1, (elapsed - REVIVE_PULL_DURATION) / 300));
+            const scale = 0.62 + (1 - Math.pow(1 - materialize, 3)) * 0.38;
+            const pulse = 1 + Math.sin(time * 0.025) * 0.09;
+            const coreSize = 68 * scale * pulse;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.42 + (1 - progress) * 0.38;
+            ctx.drawImage(reviveCoreGlowSprite, x - coreSize / 2, y - coreSize / 2, coreSize, coreSize);
+            ctx.restore();
+        }
+
+        // --- YENİ EKLENEN İNTERNET KONTROL SİSTEMİ ---
+        function handleOffline() {
+            if (state === 'PLAY') {
+                state = 'PAUSED'; 
+                hideAll(); 
+                document.getElementById('pauseMenu').classList.remove('hidden'); 
+                pauseMusic(); 
+            }
+            document.getElementById('offlineOverlay').classList.remove('hidden');
+        }
+
+        function handleOnline() {
+            document.getElementById('offlineOverlay').classList.add('hidden');
+        }
+
+        window.addEventListener('offline', handleOffline);
+        window.addEventListener('online', handleOnline);
+
+        if (!navigator.onLine) {
+            handleOffline();
+        }
+        // ----------------------------------------------
+
+        function beginActualGameplay() {
+            if (state !== 'WAITING') return;
+            state = 'PLAY';
+            document.getElementById('tapStart').classList.add('hidden');
+            document.getElementById('liveScore').classList.remove('hidden');
+            lastUpdate = performance.now();
+            startMusicLoop('game', 180);
+        }
+
+        function handleGameplayPointerInput(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('#achievementsList')) return;
+            if (!navigator.onLine) return;
+
+            if (state === 'WAITING') {
+                beginActualGameplay();
+            } else if (state === 'PLAY') {
+                player.dir *= -1;
+                const px = center.x + Math.cos(player.angle) * orbitRadius;
+                const py = center.y + Math.sin(player.angle) * orbitRadius;
+                createParticleBurst(px, py, 'tap');
+            }
+        }
+
+        let lastTouchInputAt = 0;
+        function isInteractiveUiTarget(target) {
+            return !!(target && target.closest && target.closest(
+                'button, input, label, select, textarea, a, #achievementsList, .settings-panel'
+            ));
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            // Kontrollerin kendi fare/dokunma davranışına müdahale etme.
+            if (isInteractiveUiTarget(e.target)) return;
+            // Mobil tarayıcılarda touchstart sonrasında oluşan sentetik mousedown'u yoksay.
+            if (Date.now() - lastTouchInputAt < 700) return;
+            handleGameplayPointerInput(e);
+        });
+
+        window.addEventListener('touchstart', (e) => {
+            // Range slider gibi yerel mobil kontrollerin touch olaylarını engelleme.
+            // Özellikle preventDefault çağrısı, ses seviyesi sürgüsünün hareket etmesini durduruyordu.
+            if (isInteractiveUiTarget(e.target)) return;
+            if (!navigator.onLine) return;
+            lastTouchInputAt = Date.now();
+            e.preventDefault();
+            handleGameplayPointerInput(e);
+        }, { passive: false });
+
+
+        function showGameOverMenu() {
+            hideAll();
+            const deathTitle = document.getElementById('deathTitle');
+            const newRecordAlert = document.getElementById('newRecordAlert');
+
+            if (deathWasNewRecord) {
+                deathTitle.innerText = 'NEW RECORD!';
+                deathTitle.style.color = 'var(--record)';
+                deathTitle.style.textShadow = '0 0 30px var(--record)';
+                newRecordAlert.classList.remove('hidden');
+            } else {
+                deathTitle.innerText = 'SHATTERED';
+                deathTitle.style.color = 'var(--danger)';
+                deathTitle.style.textShadow = '0 0 30px var(--danger)';
+                newRecordAlert.classList.add('hidden');
+            }
+
+            document.getElementById('finalScoreValue').textContent = score;
+            document.getElementById('reviveBtn').classList.toggle('hidden', reviveUsedThisRun);
+            document.getElementById('reviveBtn').disabled = false;
+            document.getElementById('finalCombo').textContent = `${comboBestThisRun}×`;
+            document.getElementById('finalComboBonus').textContent = `+${comboBonusThisRun}`;
+            const gameOver = document.getElementById('gameOver');
+            gameOver.classList.remove('hidden');
+            gameOver.classList.remove('gameover-enter');
+
+            // Patlama ağır çekime geçtiği karede menü yükselir ve bütün ekran kısa süre sarsılır.
+            document.body.classList.remove('death-screen-shake');
+            void document.body.offsetWidth;
+            document.body.classList.add('death-screen-shake');
+            requestAnimationFrame(() => gameOver.classList.add('gameover-enter'));
+            checkInterstitialAd();
+        }
+
+        function triggerDeathFlash() {
+            const flash = document.getElementById('deathFlash');
+            flash.classList.remove('flash-active');
+            void flash.offsetWidth;
+            flash.classList.add('flash-active');
+        }
+
+        function update(time) {
+            if (state === 'PAUSED') { lastUpdate = time; requestAnimationFrame(update); return; }
+            const dt = Math.min(50, Math.max(0, time - lastUpdate));
+            lastUpdate = time;
+
+            if (state === 'REVIVING') updateReviveSequence(time);
+
+            let deathZoom = 1;
+            let reviveCameraZoom = 1;
+            if (state === 'REVIVING' && reviveStartTime !== null) {
+                const cameraProgress = Math.max(0, Math.min(1, (time - reviveStartTime) / 720));
+                const cameraEase = 1 - Math.pow(1 - cameraProgress, 3);
+                reviveCameraZoom = 1.52 - 0.52 * cameraEase;
+            }
+            if (state === 'GAMEOVER' && deathCinematicStart !== null) {
+                if (deathPhase === 'zoom') {
+                    // Önceki sürüme göre daha uzun, yumuşak başlayıp yumuşak biten kamera yaklaşması.
+                    const elapsed = time - deathPhaseStart;
+                    const progress = Math.min(1, elapsed / 900);
+                    const eased = progress < 0.5
+                        ? 4 * progress * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                    deathZoom = 1 + 0.52 * eased;
+                    if (progress >= 1) {
+                        // Patlama ilk anda tam hızda yayılır; menü henüz görünmez.
+                        deathPhase = 'burst';
+                        deathPhaseStart = time;
+                        // Ses, titreşim ve parçacıklar gerçek patlama karesinde birlikte tetiklenir.
+                        playSoundEffect('bomb.mp3', { volume: 1 });
+                        triggerDeathVibration();
+                        createParticleBurst(deathPosition.x, deathPosition.y, 'death');
+                        deathZoom = 1.52;
+                    }
+                } else if (deathPhase === 'burst') {
+                    deathZoom = 1.52;
+                    // Kısa ve sert patlama darbesinin ardından aynı karede ağır çekim + menü.
+                    if (time - deathPhaseStart >= 135) {
+                        deathPhase = 'slowmo';
+                        deathPhaseStart = time;
+                        triggerDeathFlash();
+                        showGameOverMenu();
+                    }
+                } else if (deathPhase === 'slowmo') {
+                    deathZoom = 1.52;
+                }
+            }
+
+            // Opak arka plan yüzeyi tüm canvas'ı kaplar; ayrıca clearRect yapmak gereksizdir.
+            // Arka plan da skora değil, bu turun gerçek zorluk seviyesine tepki verir.
+            const backgroundDifficulty = (state === 'PLAY' || state === 'GAMEOVER' || state === 'PAUSED')
+                ? difficultyLevel : 0;
+            drawDynamicBackground(time, backgroundDifficulty);
+            updateScoreCounter(time);
+
+            if (state === 'MENU' || state === 'SETTINGS' || state === 'ACHIEVEMENTS') {
+                stars.forEach(star => { star.update(); star.draw(); });
+                requestAnimationFrame(update);
+                return;
+            }
+
+            // Çarpışma öncesi kamera oyuncuya doğru yumuşakça yaklaşır.
+            ctx.save();
+            if (state === 'GAMEOVER' && deathZoom > 1) {
+                ctx.translate(cw / 2 - deathPosition.x * deathZoom, ch / 2 - deathPosition.y * deathZoom);
+                ctx.scale(deathZoom, deathZoom);
+            } else if (state === 'REVIVING' && reviveCameraZoom > 1.001) {
+                // Ölüm anındaki yakın plan, yeniden doğarken yumuşakça normal kameraya açılır.
+                ctx.translate(cw / 2 - revivePosition.x * reviveCameraZoom, ch / 2 - revivePosition.y * reviveCameraZoom);
+                ctx.scale(reviveCameraZoom, reviveCameraZoom);
+            }
+
+            const starSpeed = 1 + backgroundDifficulty * 1.65;
+            stars.forEach(star => { star.update(starSpeed); star.draw(); });
+            drawOrbitField(time, backgroundDifficulty);
+            drawImpactFlashes(time);
+
+            const particleTimeScale = state === 'GAMEOVER' && deathPhase === 'slowmo' ? 0.14 : 1;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.update(particleTimeScale); // Patlama önce hızlı, menüyle birlikte ağır çekim.
+                particle.draw();
+                if (particle.life <= 0 || particle.size <= 0.2) {
+                    particles[i] = particles[particles.length - 1];
+                    particles.pop();
+                    recycleParticle(particle);
+                }
+            }
+            for (let i = trailParticles.length - 1; i >= 0; i--) {
+                const particle = trailParticles[i];
+                particle.update(particleTimeScale);
+                particle.draw();
+                if (particle.life <= 0 || particle.size <= 0.2) {
+                    trailParticles[i] = trailParticles[trailParticles.length - 1];
+                    trailParticles.pop();
+                    recycleParticle(particle);
+                }
+            }
+            ctx.restore();
+            ctx.globalAlpha = 1;
+
+            if (state === 'PLAY') {
+                // Süre yalnızca oyun gerçekten oynanırken ilerler; menüde ve duraklatmada artmaz.
+                elapsedRunTimeMs += dt;
+                const normalizedTime = Math.min(1, elapsedRunTimeMs / DIFFICULTY_RAMP_MS);
+                difficultyLevel = Math.pow(normalizedTime, 1.45); // İlk dakikada daha yavaş, sonra kademeli hızlanır.
+
+                player.angle += player.speed * player.dir;
+                enemyTimer += dt;
+
+                // Düşman aralığı yaklaşık 2 dakikada 1100 ms'den 430 ms'ye iner.
+                // Skor/kombo bonusları bu hesabın hiçbir parçasında kullanılmaz.
+                const spawnRate = Math.max(430, 1100 - (difficultyLevel * 670));
+
+                if (enemyTimer > spawnRate) {
+                    const side = Math.floor(Math.random() * 4);
+                    let x, y;
+                    if (side === 0) { x = Math.random() * cw; y = -30; }
+                    else if (side === 1) { x = Math.random() * cw; y = ch + 30; }
+                    else if (side === 2) { x = -30; y = Math.random() * ch; }
+                    else { x = cw + 30; y = Math.random() * ch; }
+                    const angle = Math.atan2(center.y - y, center.x - x);
+                    // Düşman hızı da yalnızca zamana bağlıdır ve önceki sürüme göre daha yavaş artar.
+                    // İlk 2 dakikada yaklaşık 2.4 -> 3.3; sonrasında dakikada +0.8.
+                    const timeAfterRampMinutes = Math.max(0, elapsedRunTimeMs - DIFFICULTY_RAMP_MS) / 60000;
+                    const speed = 2.4 + (difficultyLevel * 0.9) + (timeAfterRampMinutes * 0.8);
+                    const color = enemyColorPalette[Math.floor(Math.random() * enemyColorPalette.length)];
+                    const spawnPlayerX = center.x + Math.cos(player.angle) * orbitRadius;
+                    const spawnPlayerY = center.y + Math.sin(player.angle) * orbitRadius;
+                    const initialDistance = Math.hypot(spawnPlayerX - x, spawnPlayerY - y);
+                    enemies.push({
+                        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        size: 10, color, previousDistance: initialDistance,
+                        closestDistance: initialDistance, nearMissAwarded: false
+                    });
+                    enemyTimer = 0;
+                    score++;
+                    if (scoreCountAnimation) scoreCountAnimation.to = score;
+                    else document.getElementById('liveScore').innerText = score;
+                    checkAchievements(score);
+                }
+
+                const px = center.x + Math.cos(player.angle) * orbitRadius;
+                const py = center.y + Math.sin(player.angle) * orbitRadius;
+                if (visualEffectsEnabled) {
+                    trailEmitTimer += dt;
+                    if (trailEmitTimer >= 28) {
+                        trailEmitTimer %= 28;
+                        emitPlayerTrail(px, py, player.angle, player.dir, time);
+                    }
+                }
+
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const en = enemies[i];
+                    en.x += en.vx;
+                    en.y += en.vy;
+                    const distanceToPlayer = Math.hypot(px - en.x, py - en.y);
+                    const collisionDistance = en.size + player.size - 2;
+                    if (distanceToPlayer < collisionDistance) {
+                        handleGameOver();
+                        break;
+                    }
+
+                    en.closestDistance = Math.min(en.closestDistance, distanceToPlayer);
+                    const isMovingAway = distanceToPlayer > en.previousDistance + 0.35;
+                    if (!en.nearMissAwarded && isMovingAway &&
+                        en.closestDistance <= NEAR_MISS_DISTANCE &&
+                        en.closestDistance > collisionDistance + 1.5) {
+                        en.nearMissAwarded = true;
+                        registerNearMiss(en);
+                    }
+                    en.previousDistance = distanceToPlayer;
+
+                    if (en.x < -60 || en.x > cw + 60 || en.y < -60 || en.y > ch + 60) {
+                        enemies.splice(i, 1);
+                        continue;
+                    }
+                    drawEnemyOrb(en, time, px, py);
+                }
+
+                if (state === 'PLAY' && comboCount > 0) {
+                    comboTimer = Math.max(0, comboTimer - dt);
+                    refreshComboHud();
+                    if (comboTimer <= 0) finishCombo();
+                }
+            } else if (state === 'REVIVING' || (state === 'GAMEOVER' && deathPhase === 'zoom')) {
+                // Devam/ölüm yakın planında da düşman yansıması ana topun gerçek konumuna bakar.
+                const lightSource = state === 'REVIVING' ? revivePosition : deathPosition;
+                for (const en of enemies) {
+                    drawEnemyOrb(en, time, lightSource.x, lightSource.y);
+                }
+            }
+
+            // Yakınlaşma aşamasında oyuncu topu son kez görünür; patlamada gizlenir.
+            const revivePulling = state === 'REVIVING' && (time - reviveStartTime) < REVIVE_PULL_DURATION;
+            if ((state !== 'GAMEOVER' || deathPhase === 'zoom') && !revivePulling) {
+                const px = center.x + Math.cos(player.angle) * orbitRadius;
+                const py = center.y + Math.sin(player.angle) * orbitRadius;
+                const reviveMaterialize = state === 'REVIVING'
+                    ? Math.max(0.62, Math.min(1, 0.62 + ((time - reviveStartTime - REVIVE_PULL_DURATION) / 300) * 0.38))
+                    : 1;
+                drawPlayerOrb(px, py, time, reviveMaterialize);
+            }
+
+            if (state === 'REVIVING') drawReviveEffects(time);
+
+            ctx.restore();
+            requestAnimationFrame(update);
+        }
+
+        function handleGameOver() {
+            if (state === 'GAMEOVER') return;
+            // Ölüm animasyonundan önce elde edilen combo puanları da toplam skora yazılır.
+            finishCombo();
+            state = 'GAMEOVER';
+            deathCinematicStart = performance.now();
+            deathPhaseStart = deathCinematicStart;
+            deathPhase = 'zoom';
+            stopMusicWithFade(900);
+            stopSoundEffect('charge.mp3', 100);
+            // Patlama sesi zoom sırasında değil, zoom tamamlanınca çalınır.
+            stopSoundEffect('bomb.mp3', 60);
+            deathPosition.x = center.x + Math.cos(player.angle) * orbitRadius;
+            deathPosition.y = center.y + Math.sin(player.angle) * orbitRadius;
+            deathCounter++;
+            clearParticleList(trailParticles);
+            document.getElementById('pauseBtn').classList.add('hidden');
+
+            deathWasNewRecord = false;
+            if (score > bestScore && score > 0) {
+                bestScore = score;
+                localStorage.setItem('pivotBest', bestScore);
+                deathWasNewRecord = true;
+            }
+        }
+
+        showMenu();
+        // Sayfa açıldığı anda menü müziğini başlatmayı dene; autoplay izni yoksa
+        // yukarıdaki ilk pointerdown dinleyicisi aynı parçayı kullanıcı etkileşiminde başlatır.
+        startMusicLoop('menu', 0);
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
